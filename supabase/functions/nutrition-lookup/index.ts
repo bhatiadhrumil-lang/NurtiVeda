@@ -20,7 +20,14 @@ serve(async (req) => {
       );
     }
 
-    const GOOGLE_API_KEY = "mAQ.Ab8RN6IimMiM8FujoFTphmP6aLZe8hp5_e8U9CSwr1kjSCD3mA";
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    if (!LOVABLE_API_KEY) {
+      console.error("LOVABLE_API_KEY is not configured");
+      return new Response(
+        JSON.stringify({ error: "AI service is not configured" }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     console.log("Looking up nutrition for:", foodQuery);
 
@@ -72,10 +79,10 @@ Always respond with valid JSON in this exact structure:
 
 Use accurate nutritional data. If exact values are unknown, provide reasonable estimates based on similar foods. Include all vitamins and minerals listed above.`;
 
-    const response = await fetch("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", {
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${GOOGLE_API_KEY}`,
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
