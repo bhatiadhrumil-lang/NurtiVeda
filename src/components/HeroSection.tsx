@@ -1,15 +1,18 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Camera, Search, Sparkles, Upload } from "lucide-react";
+import { Camera, Search, Sparkles, Upload, Loader2 } from "lucide-react";
+import { useNutritionLookup } from "@/hooks/useNutritionLookup";
+import NutritionResult from "@/components/NutritionResult";
 
 const HeroSection = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [isDragging, setIsDragging] = useState(false);
+  const { isLoading, nutritionData, lookupNutrition, clearNutritionData } = useNutritionLookup();
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Searching for:", searchQuery);
+    lookupNutrition(searchQuery);
   };
 
   return (
@@ -52,8 +55,15 @@ const HeroSection = () => {
                   className="pl-12 pr-4 h-14 text-base shadow-card"
                 />
               </div>
-              <Button type="submit" variant="hero" size="xl">
-                Search
+              <Button type="submit" variant="hero" size="xl" disabled={isLoading}>
+                {isLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Searching...
+                  </>
+                ) : (
+                  "Search"
+                )}
               </Button>
             </div>
           </form>
@@ -117,6 +127,11 @@ const HeroSection = () => {
           </div>
         </div>
       </div>
+
+      {/* Nutrition Result Modal */}
+      {nutritionData && (
+        <NutritionResult data={nutritionData} onClose={clearNutritionData} />
+      )}
     </section>
   );
 };
