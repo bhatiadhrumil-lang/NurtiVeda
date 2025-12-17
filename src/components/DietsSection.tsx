@@ -9,7 +9,20 @@ const diets: DietNutrition[] = [
     description: "High-fat, low-carb diet for metabolic health and weight management",
     icon: Flame,
     color: "terracotta",
-    foods: ["Avocado", "Eggs", "Salmon", "Nuts", "Cheese", "Olive Oil", "Beef", "Chicken"],
+    foods: [
+      // Proteins
+      "Eggs", "Salmon", "Beef", "Chicken", "Bacon", "Sardines",
+      // Dairy
+      "Cheese", "Butter", "Ghee", "Heavy Cream", "Paneer", "Cream Cheese",
+      // Fats & Oils
+      "Avocado", "Olive Oil", "Coconut Oil", "MCT Oil",
+      // Nuts & Dry Fruits
+      "Almonds", "Walnuts", "Macadamia", "Pecans", "Brazil Nuts", "Chia Seeds", "Flaxseeds",
+      // Low-Carb Vegetables
+      "Spinach", "Broccoli", "Cauliflower", "Zucchini", "Asparagus",
+      // Limited Fruits
+      "Berries", "Lemon", "Lime", "Coconut"
+    ],
     dailyCalories: 1800,
     macronutrients: {
       protein: { grams: 90, percentage: 20 },
@@ -42,7 +55,22 @@ const diets: DietNutrition[] = [
     description: "Heart-healthy diet rich in olive oil, fish, and fresh vegetables",
     icon: Heart,
     color: "sage",
-    foods: ["Olive Oil", "Fish", "Tomatoes", "Legumes", "Whole Grains", "Nuts", "Red Wine", "Feta"],
+    foods: [
+      // Proteins
+      "Fish", "Chicken", "Eggs", "Legumes", "Lentils", "Chickpeas",
+      // Dairy
+      "Feta Cheese", "Greek Yogurt", "Goat Cheese", "Milk", "Buttermilk",
+      // Fats & Oils
+      "Olive Oil", "Red Wine",
+      // Grains
+      "Whole Grains", "Quinoa", "Brown Rice", "Oats", "Barley",
+      // Nuts & Dry Fruits
+      "Almonds", "Walnuts", "Pistachios", "Dates", "Figs", "Raisins", "Apricots",
+      // Vegetables
+      "Tomatoes", "Spinach", "Eggplant", "Artichokes", "Peppers",
+      // Fruits
+      "Oranges", "Grapes", "Pomegranate", "Olives", "Lemons", "Apples", "Pears"
+    ],
     dailyCalories: 2000,
     macronutrients: {
       protein: { grams: 80, percentage: 16 },
@@ -75,7 +103,20 @@ const diets: DietNutrition[] = [
     description: "Plant-based nutrition for ethical eating and environmental impact",
     icon: Leaf,
     color: "primary",
-    foods: ["Tofu", "Quinoa", "Lentils", "Vegetables", "Beans", "Tempeh", "Seeds", "Leafy Greens"],
+    foods: [
+      // Proteins
+      "Tofu", "Tempeh", "Lentils", "Chickpeas", "Black Beans", "Edamame",
+      // Plant-Based Dairy Alternatives
+      "Almond Milk", "Oat Milk", "Coconut Yogurt", "Cashew Cheese", "Soy Milk",
+      // Grains
+      "Quinoa", "Brown Rice", "Oats", "Millet", "Amaranth",
+      // Nuts & Dry Fruits
+      "Almonds", "Walnuts", "Cashews", "Dates", "Raisins", "Dried Cranberries", "Prunes", "Chia Seeds", "Hemp Seeds", "Pumpkin Seeds",
+      // Vegetables
+      "Leafy Greens", "Broccoli", "Cauliflower", "Sweet Potato", "Carrots", "Beets",
+      // Fruits
+      "Bananas", "Apples", "Berries", "Mangoes", "Papaya", "Oranges", "Kiwi", "Avocado"
+    ],
     dailyCalories: 1900,
     macronutrients: {
       protein: { grams: 70, percentage: 15 },
@@ -108,7 +149,20 @@ const diets: DietNutrition[] = [
     description: "Ancestral eating focusing on whole, unprocessed foods",
     icon: Sun,
     color: "golden",
-    foods: ["Meat", "Seafood", "Vegetables", "Fruits", "Eggs", "Nuts", "Seeds", "Sweet Potato"],
+    foods: [
+      // Proteins
+      "Grass-fed Beef", "Chicken", "Turkey", "Salmon", "Sardines", "Eggs", "Lamb",
+      // Dairy (limited)
+      "Ghee", "Grass-fed Butter",
+      // Fats & Oils
+      "Olive Oil", "Coconut Oil", "Avocado Oil",
+      // Nuts & Dry Fruits
+      "Almonds", "Walnuts", "Macadamia", "Cashews", "Dates", "Figs", "Raisins", "Dried Mango", "Sunflower Seeds", "Pumpkin Seeds",
+      // Vegetables
+      "Sweet Potato", "Broccoli", "Spinach", "Kale", "Carrots", "Beets", "Squash",
+      // Fruits
+      "Berries", "Apples", "Oranges", "Bananas", "Grapes", "Watermelon", "Peaches", "Pineapple"
+    ],
     dailyCalories: 2100,
     macronutrients: {
       protein: { grams: 130, percentage: 25 },
@@ -141,7 +195,20 @@ const diets: DietNutrition[] = [
     description: "Time-restricted eating for cellular renewal and weight control",
     icon: Moon,
     color: "forest",
-    foods: ["Any foods", "During eating window", "Focus on nutrition", "Stay hydrated", "Protein-rich", "Vegetables", "Healthy Fats"],
+    foods: [
+      // Proteins
+      "Eggs", "Chicken", "Fish", "Lean Beef", "Greek Yogurt", "Cottage Cheese",
+      // Dairy
+      "Milk", "Paneer", "Cheese", "Butter", "Ghee",
+      // Grains & Carbs
+      "Brown Rice", "Quinoa", "Oats", "Sweet Potato", "Whole Wheat Bread",
+      // Nuts & Dry Fruits
+      "Almonds", "Walnuts", "Cashews", "Dates", "Figs", "Raisins", "Prunes", "Apricots",
+      // Vegetables
+      "Spinach", "Broccoli", "Carrots", "Bell Peppers", "Tomatoes",
+      // Fruits
+      "Bananas", "Apples", "Berries", "Oranges", "Grapes", "Papaya", "Watermelon"
+    ],
     dailyCalories: 1600,
     macronutrients: {
       protein: { grams: 80, percentage: 20 },
@@ -174,7 +241,20 @@ const diets: DietNutrition[] = [
     description: "30-day elimination diet to reset your metabolism and identify sensitivities",
     icon: Salad,
     color: "sage",
-    foods: ["Vegetables", "Meat", "Seafood", "Fruits", "Eggs", "Nuts", "Ghee", "Coconut Oil"],
+    foods: [
+      // Proteins
+      "Beef", "Chicken", "Turkey", "Salmon", "Shrimp", "Eggs", "Pork",
+      // Dairy (only ghee allowed)
+      "Ghee", "Clarified Butter",
+      // Fats & Oils
+      "Olive Oil", "Coconut Oil", "Avocado Oil",
+      // Nuts & Dry Fruits
+      "Almonds", "Cashews", "Walnuts", "Macadamia", "Dates", "Dried Coconut", "Sunflower Seeds",
+      // Vegetables
+      "Broccoli", "Cauliflower", "Sweet Potato", "Spinach", "Kale", "Zucchini", "Asparagus",
+      // Fruits
+      "Apples", "Bananas", "Berries", "Oranges", "Grapes", "Mango", "Pineapple", "Peaches"
+    ],
     dailyCalories: 1800,
     macronutrients: {
       protein: { grams: 100, percentage: 22 },
@@ -207,7 +287,20 @@ const diets: DietNutrition[] = [
     description: "Digestive-friendly diet for IBS and gut health optimization",
     icon: Wheat,
     color: "terracotta",
-    foods: ["Rice", "Eggs", "Zucchini", "Carrots", "Chicken", "Fish", "Oranges", "Grapes"],
+    foods: [
+      // Proteins
+      "Chicken", "Fish", "Eggs", "Tofu (firm)", "Beef", "Turkey",
+      // Dairy (lactose-free)
+      "Lactose-free Milk", "Lactose-free Yogurt", "Cheddar Cheese", "Brie", "Butter",
+      // Grains
+      "Rice", "Quinoa", "Oats", "Gluten-free Bread",
+      // Nuts & Dry Fruits (limited)
+      "Walnuts", "Macadamia", "Peanuts", "Pecans", "Chia Seeds",
+      // Vegetables
+      "Carrots", "Zucchini", "Cucumber", "Tomatoes", "Spinach", "Bell Peppers", "Eggplant",
+      // Fruits
+      "Oranges", "Grapes", "Strawberries", "Blueberries", "Kiwi", "Cantaloupe", "Pineapple"
+    ],
     dailyCalories: 1700,
     macronutrients: {
       protein: { grams: 85, percentage: 20 },
@@ -240,7 +333,20 @@ const diets: DietNutrition[] = [
     description: "Dietary approach to stop hypertension and improve heart health",
     icon: Heart,
     color: "primary",
-    foods: ["Grains", "Vegetables", "Lean Protein", "Low Sodium", "Fruits", "Dairy", "Nuts", "Seeds"],
+    foods: [
+      // Proteins
+      "Lean Chicken", "Fish", "Turkey", "Eggs", "Legumes", "Beans",
+      // Dairy
+      "Low-fat Milk", "Buttermilk", "Greek Yogurt", "Low-fat Cheese", "Cottage Cheese", "Paneer",
+      // Grains
+      "Whole Grains", "Brown Rice", "Oats", "Quinoa", "Whole Wheat Bread",
+      // Nuts & Dry Fruits
+      "Almonds", "Walnuts", "Pistachios", "Flaxseeds", "Sunflower Seeds", "Raisins", "Dates", "Apricots",
+      // Vegetables
+      "Spinach", "Broccoli", "Carrots", "Tomatoes", "Sweet Potato", "Beets", "Leafy Greens",
+      // Fruits
+      "Bananas", "Oranges", "Apples", "Berries", "Grapes", "Pomegranate", "Watermelon", "Papaya"
+    ],
     dailyCalories: 2000,
     macronutrients: {
       protein: { grams: 90, percentage: 18 },
