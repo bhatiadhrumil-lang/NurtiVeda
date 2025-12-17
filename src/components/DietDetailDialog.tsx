@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -5,7 +6,14 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
-import { Flame, Droplets, Wheat, Beef, Pill, Apple } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Flame, Droplets, Wheat, Beef, Pill, Apple, Utensils } from "lucide-react";
 
 export interface DietNutrition {
   name: string;
@@ -35,8 +43,35 @@ interface DietDetailDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
+const mealNames: Record<number, string[]> = {
+  3: ["Breakfast", "Lunch", "Dinner"],
+  4: ["Breakfast", "Lunch", "Snack", "Dinner"],
+  5: ["Breakfast", "Mid-Morning Snack", "Lunch", "Evening Snack", "Dinner"],
+};
+
+const mealCalorieDistribution: Record<number, number[]> = {
+  3: [0.30, 0.40, 0.30], // 30%, 40%, 30%
+  4: [0.25, 0.35, 0.10, 0.30], // 25%, 35%, 10%, 30%
+  5: [0.25, 0.10, 0.30, 0.10, 0.25], // 25%, 10%, 30%, 10%, 25%
+};
+
 const DietDetailDialog = ({ diet, open, onOpenChange }: DietDetailDialogProps) => {
+  const [mealsPerDay, setMealsPerDay] = useState<number>(3);
+
   if (!diet) return null;
+
+  const getMealBreakdown = () => {
+    const distribution = mealCalorieDistribution[mealsPerDay];
+    const names = mealNames[mealsPerDay];
+    
+    return names.map((name, index) => ({
+      name,
+      calories: Math.round(diet.dailyCalories * distribution[index]),
+      protein: Math.round(diet.macronutrients.protein.grams * distribution[index]),
+      carbs: Math.round(diet.macronutrients.carbohydrates.grams * distribution[index]),
+      fat: Math.round(diet.macronutrients.fat.grams * distribution[index]),
+    }));
+  };
 
   const getColorClasses = (color: string) => {
     switch (color) {
@@ -78,7 +113,41 @@ const DietDetailDialog = ({ diet, open, onOpenChange }: DietDetailDialogProps) =
                 <p className="text-3xl font-bold text-foreground">{diet.dailyCalories} kcal</p>
               </div>
             </div>
+            <div className="flex items-center gap-2">
+              <Utensils className="w-5 h-5 text-muted-foreground" />
+              <Select value={mealsPerDay.toString()} onValueChange={(v) => setMealsPerDay(Number(v))}>
+                <SelectTrigger className="w-[140px] bg-background">
+                  <SelectValue placeholder="Meals/day" />
+                </SelectTrigger>
+                <SelectContent className="bg-background">
+                  <SelectItem value="3">3 Meals/day</SelectItem>
+                  <SelectItem value="4">4 Meals/day</SelectItem>
+                  <SelectItem value="5">5 Meals/day</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
+        </div>
+
+        {/* Meal Breakdown */}
+        <div className="mt-4 grid gap-3">
+          <h3 className="font-serif text-lg font-semibold text-foreground flex items-center gap-2">
+            <Utensils className="w-5 h-5 text-primary" />
+            Meal Breakdown ({mealsPerDay} meals/day)
+          </h3>
+          {getMealBreakdown().map((meal, index) => (
+            <div key={index} className="bg-card rounded-xl p-4 border border-border/50">
+              <div className="flex items-center justify-between mb-2">
+                <span className="font-medium text-foreground">{meal.name}</span>
+                <span className="text-lg font-bold text-terracotta">{meal.calories} kcal</span>
+              </div>
+              <div className="flex gap-4 text-sm text-muted-foreground">
+                <span>Protein: <span className="font-medium text-foreground">{meal.protein}g</span></span>
+                <span>Carbs: <span className="font-medium text-foreground">{meal.carbs}g</span></span>
+                <span>Fat: <span className="font-medium text-foreground">{meal.fat}g</span></span>
+              </div>
+            </div>
+          ))}
         </div>
 
         {/* Macronutrients */}
