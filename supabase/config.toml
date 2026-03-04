@@ -1,1 +1,7 @@
 project_id = "crwpbzztfbzhrkwzuaqh"
+
+[functions.nutrition-lookup]
+verify_jwt = false
+
+[functions.analyze-food-image]
+verify_jwt = false
