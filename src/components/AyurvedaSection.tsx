@@ -63,6 +63,7 @@ const ayurvedicCategories: CategoryConfig[] = [
 
 const AyurvedaSection = () => {
   const [explorerCategory, setExplorerCategory] = useState<CategoryConfig | null>(null);
+  const navigate = useNavigate();
 
   return (
     <section id="ayurveda" className="py-24 bg-background relative overflow-hidden">
