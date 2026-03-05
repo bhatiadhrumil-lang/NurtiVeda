@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Brain, Droplets, Heart, Flame } from "lucide-react";
 import { stressReliefFoods, bloodPressureFoods, bloodSugarFoods, antiSwellingFoods } from "./AyurvedaFoodData";
@@ -62,6 +63,7 @@ const ayurvedicCategories: CategoryConfig[] = [
 
 const AyurvedaSection = () => {
   const [explorerCategory, setExplorerCategory] = useState<CategoryConfig | null>(null);
+  const navigate = useNavigate();
 
   return (
     <section id="ayurveda" className="py-24 bg-background relative overflow-hidden">
@@ -136,7 +138,7 @@ const AyurvedaSection = () => {
           <p className="text-muted-foreground mb-4">
             Want personalized Ayurvedic recommendations based on your body type?
           </p>
-          <Button variant="hero" size="xl">
+          <Button variant="hero" size="xl" onClick={() => navigate("/dosha-quiz")}>
             Take Dosha Quiz
             <ArrowRight className="w-5 h-5 ml-2" />
           </Button>

@@ -14,6 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
+      dosha_results: {
+        Row: {
+          answers: Json | null
+          created_at: string
+          id: string
+          kapha_score: number
+          pitta_score: number
+          primary_dosha: string
+          secondary_dosha: string | null
+          user_id: string
+          vata_score: number
+        }
+        Insert: {
+          answers?: Json | null
+          created_at?: string
+          id?: string
+          kapha_score?: number
+          pitta_score?: number
+          primary_dosha: string
+          secondary_dosha?: string | null
+          user_id: string
+          vata_score?: number
+        }
+        Update: {
+          answers?: Json | null
+          created_at?: string
+          id?: string
+          kapha_score?: number
+          pitta_score?: number
+          primary_dosha?: string
+          secondary_dosha?: string | null
+          user_id?: string
+          vata_score?: number
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
