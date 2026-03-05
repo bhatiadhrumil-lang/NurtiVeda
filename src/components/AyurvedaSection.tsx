@@ -138,7 +138,7 @@ const AyurvedaSection = () => {
           <p className="text-muted-foreground mb-4">
             Want personalized Ayurvedic recommendations based on your body type?
           </p>
-          <Button variant="hero" size="xl">
+          <Button variant="hero" size="xl" onClick={() => navigate("/dosha-quiz")}>
             Take Dosha Quiz
             <ArrowRight className="w-5 h-5 ml-2" />
           </Button>
