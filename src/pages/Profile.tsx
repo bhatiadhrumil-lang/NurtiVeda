@@ -108,14 +108,18 @@ const Profile = () => {
         </Button>
 
         <Tabs defaultValue="profile" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 mb-6">
+          <TabsList className="grid w-full grid-cols-3 mb-6">
             <TabsTrigger value="profile" className="flex items-center gap-2">
               <User className="w-4 h-4" />
-              Profile Settings
+              Profile
+            </TabsTrigger>
+            <TabsTrigger value="meal-plan" className="flex items-center gap-2">
+              <ClipboardList className="w-4 h-4" />
+              Meal Plan
             </TabsTrigger>
             <TabsTrigger value="meals" className="flex items-center gap-2">
               <Utensils className="w-4 h-4" />
-              Meal History
+              History
             </TabsTrigger>
           </TabsList>
 
