@@ -7,6 +7,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import CompleteProfile from "./pages/CompleteProfile";
+import Profile from "./pages/Profile";
 import DoshaQuiz from "./pages/DoshaQuiz";
 import MealLog from "./pages/MealLog";
 import NotFound from "./pages/NotFound";
