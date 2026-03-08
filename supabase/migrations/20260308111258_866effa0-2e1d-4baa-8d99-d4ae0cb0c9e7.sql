@@ -1,0 +1,30 @@
+-- Insert missing meal plans from DietsSection
+INSERT INTO meal_plans (name, description, diet_type, goal, daily_calories, protein_ratio, carbs_ratio, fat_ratio, meals_per_day, foods, sample_meals, substitutions, tips) VALUES
+
+-- Intermittent Fasting Plan
+('Intermittent Fasting Plan', 'Time-restricted eating for cellular renewal and weight control with flexible meal windows', 'intermittent_fasting', 'weight_loss', 1600, 0.2, 0.45, 0.35, 2,
+'["Eggs", "Chicken", "Fish", "Lean Beef", "Greek Yogurt", "Brown Rice", "Quinoa", "Oats", "Almonds", "Walnuts", "Dates", "Spinach", "Broccoli", "Carrots", "Bananas", "Apples", "Berries"]'::jsonb,
+'[{"name": "Break-Fast Meal", "time": "12:00 PM", "prep_time": "15 mins", "calories": 700, "foods": ["Eggs", "Avocado", "Whole grain toast", "Greek Yogurt"], "instructions": ["Scramble 3 eggs with vegetables", "Toast whole grain bread", "Slice avocado and serve on top", "Add Greek yogurt on the side"]}, {"name": "Dinner", "time": "7:00 PM", "prep_time": "30 mins", "calories": 900, "foods": ["Grilled chicken", "Quinoa", "Roasted vegetables"], "instructions": ["Season and grill chicken breast", "Cook quinoa according to package", "Roast mixed vegetables with olive oil"]}]'::jsonb,
+'[{"original": "Chicken", "alternatives": ["Turkey", "Fish", "Tofu"]}, {"original": "Eggs", "alternatives": ["Cottage cheese", "Greek yogurt"]}]'::jsonb,
+ARRAY['Maintain 16:8 fasting window', 'Stay hydrated during fasting hours', 'Break fast with protein-rich foods', 'Avoid processed foods during eating window']),
+
+-- Whole30 Reset
+('Whole30 Reset', '30-day elimination diet to reset your metabolism and identify food sensitivities', 'whole30', 'health', 1800, 0.22, 0.33, 0.45, 3,
+'["Beef", "Chicken", "Turkey", "Salmon", "Eggs", "Ghee", "Olive Oil", "Coconut Oil", "Almonds", "Cashews", "Dates", "Broccoli", "Sweet Potato", "Spinach", "Kale", "Apples", "Berries"]'::jsonb,
+'[{"name": "Breakfast", "time": "7:30 AM", "prep_time": "20 mins", "calories": 500, "foods": ["Eggs", "Sweet potato hash", "Avocado"], "instructions": ["Dice sweet potato and pan-fry", "Cook eggs to preference", "Slice avocado and season with salt"]}, {"name": "Lunch", "time": "12:30 PM", "prep_time": "25 mins", "calories": 600, "foods": ["Grilled salmon", "Mixed greens", "Olive oil dressing"], "instructions": ["Season and grill salmon fillet", "Prepare mixed greens salad", "Dress with olive oil and lemon"]}, {"name": "Dinner", "time": "6:30 PM", "prep_time": "30 mins", "calories": 700, "foods": ["Beef stir-fry", "Cauliflower rice", "Vegetables"], "instructions": ["Slice beef and stir-fry with coconut oil", "Rice the cauliflower and sauté", "Add mixed vegetables"]}]'::jsonb,
+'[{"original": "Beef", "alternatives": ["Chicken", "Turkey", "Pork"]}, {"original": "Salmon", "alternatives": ["Cod", "Shrimp", "Sardines"]}]'::jsonb,
+ARRAY['No added sugar, alcohol, grains, legumes, or dairy', 'Read all ingredient labels carefully', 'Meal prep on weekends', 'Keep compliant snacks available']),
+
+-- Low-FODMAP Digestive
+('Low-FODMAP Digestive', 'Digestive-friendly diet for IBS relief and gut health optimization', 'low_fodmap', 'health', 1700, 0.2, 0.5, 0.3, 3,
+'["Chicken", "Fish", "Eggs", "Firm Tofu", "Lactose-free Milk", "Cheddar Cheese", "Rice", "Quinoa", "Oats", "Walnuts", "Carrots", "Zucchini", "Spinach", "Bell Peppers", "Oranges", "Strawberries", "Kiwi"]'::jsonb,
+'[{"name": "Breakfast", "time": "8:00 AM", "prep_time": "10 mins", "calories": 400, "foods": ["Oatmeal", "Blueberries", "Lactose-free milk"], "instructions": ["Cook oats with lactose-free milk", "Top with fresh blueberries", "Add a drizzle of maple syrup"]}, {"name": "Lunch", "time": "12:30 PM", "prep_time": "25 mins", "calories": 550, "foods": ["Grilled chicken", "Rice", "Steamed carrots"], "instructions": ["Grill chicken with herbs", "Cook white or brown rice", "Steam carrots until tender"]}, {"name": "Dinner", "time": "6:30 PM", "prep_time": "30 mins", "calories": 600, "foods": ["Baked fish", "Quinoa", "Sautéed zucchini"], "instructions": ["Bake fish with olive oil and lemon", "Prepare quinoa as directed", "Sauté zucchini with herbs"]}]'::jsonb,
+'[{"original": "Chicken", "alternatives": ["Fish", "Turkey", "Firm tofu"]}, {"original": "Rice", "alternatives": ["Quinoa", "Potatoes", "Gluten-free pasta"]}]'::jsonb,
+ARRAY['Avoid high-FODMAP foods like garlic and onion', 'Keep a food diary to track triggers', 'Reintroduce foods slowly after elimination phase', 'Consult with a dietitian for guidance']),
+
+-- DASH Heart Healthy
+('DASH Heart Healthy', 'Dietary approach to stop hypertension and improve overall heart health', 'dash', 'health', 2000, 0.18, 0.55, 0.27, 3,
+'["Lean Chicken", "Fish", "Turkey", "Eggs", "Low-fat Milk", "Greek Yogurt", "Brown Rice", "Oats", "Whole Wheat Bread", "Almonds", "Walnuts", "Spinach", "Broccoli", "Tomatoes", "Beets", "Bananas", "Oranges", "Berries"]'::jsonb,
+'[{"name": "Breakfast", "time": "7:30 AM", "prep_time": "10 mins", "calories": 500, "foods": ["Oatmeal", "Banana", "Walnuts", "Low-fat milk"], "instructions": ["Cook oatmeal with low-fat milk", "Slice banana on top", "Add crushed walnuts"]}, {"name": "Lunch", "time": "12:30 PM", "prep_time": "15 mins", "calories": 650, "foods": ["Turkey sandwich", "Mixed salad", "Orange"], "instructions": ["Use whole wheat bread for sandwich", "Add lean turkey and vegetables", "Prepare side salad with olive oil dressing"]}, {"name": "Dinner", "time": "6:30 PM", "prep_time": "35 mins", "calories": 700, "foods": ["Baked salmon", "Brown rice", "Steamed broccoli"], "instructions": ["Season and bake salmon fillet", "Cook brown rice", "Steam broccoli until tender"]}]'::jsonb,
+'[{"original": "Salmon", "alternatives": ["Chicken", "Turkey", "Cod"]}, {"original": "Brown rice", "alternatives": ["Quinoa", "Sweet potato", "Whole wheat pasta"]}]'::jsonb,
+ARRAY['Limit sodium to 2300mg daily (1500mg ideal)', 'Eat 4-5 servings of fruits and vegetables daily', 'Choose whole grains over refined', 'Include potassium-rich foods like bananas']);
