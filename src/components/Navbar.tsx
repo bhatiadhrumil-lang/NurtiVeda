@@ -48,21 +48,6 @@ const Navbar = () => {
           </div>
 
           <div className="hidden md:flex items-center gap-3">
-            {user ? (
-              <>
-                <span className="text-sm text-muted-foreground flex items-center gap-1.5">
-                  <User className="w-4 h-4" />
-                  {username || "User"}
-                </span>
-                <Button variant="outline" size="sm" onClick={handleSignOut}>
-                  <LogOut className="w-4 h-4 mr-1" /> Logout
-                </Button>
-              </>
-            ) : (
-              <Button variant="hero" size="default" onClick={handleGetStarted}>
-                Get Started
-              </Button>
-            )}
           </div>
 
           <button className="md:hidden p-2 text-foreground" onClick={() => setIsOpen(!isOpen)}>
