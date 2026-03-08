@@ -50,6 +50,54 @@ export type Database = {
         }
         Relationships: []
       }
+      meal_logs: {
+        Row: {
+          calories: number
+          carbs: number
+          created_at: string
+          fat: number
+          fiber: number
+          food_items: Json
+          id: string
+          logged_at: string
+          meal_name: string
+          meal_type: string
+          notes: string | null
+          protein: number
+          user_id: string | null
+        }
+        Insert: {
+          calories?: number
+          carbs?: number
+          created_at?: string
+          fat?: number
+          fiber?: number
+          food_items?: Json
+          id?: string
+          logged_at?: string
+          meal_name: string
+          meal_type?: string
+          notes?: string | null
+          protein?: number
+          user_id?: string | null
+        }
+        Update: {
+          calories?: number
+          carbs?: number
+          created_at?: string
+          fat?: number
+          fiber?: number
+          food_items?: Json
+          id?: string
+          logged_at?: string
+          meal_name?: string
+          meal_type?: string
+          notes?: string | null
+          protein?: number
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
