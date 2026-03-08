@@ -140,7 +140,7 @@ export const useMealPlans = () => {
           foods: Array.isArray(planData.foods) ? planData.foods : [],
           sample_meals: Array.isArray(planData.sample_meals) ? planData.sample_meals : [],
         } : undefined,
-      } as UserMealPlan);
+      } as unknown as UserMealPlan);
     } else {
       setActivePlan(null);
     }
