@@ -5,10 +5,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { User, ArrowLeft, Save } from "lucide-react";
+import { User, ArrowLeft, Save, Utensils } from "lucide-react";
+import { useMealLogs } from "@/hooks/useMealLogs";
+import MealLogHistory from "@/components/MealLogHistory";
+import NutritionProgressChart from "@/components/NutritionProgressChart";
 
 const Profile = () => {
   const { user, username, refreshProfile } = useAuth();
