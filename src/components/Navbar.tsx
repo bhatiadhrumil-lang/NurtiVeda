@@ -14,6 +14,7 @@ const Navbar = () => {
     { name: "Analyze", href: "#analyze" },
     { name: "Diets", href: "#diets" },
     { name: "Ayurveda", href: "#ayurveda" },
+    { name: "Meal Log", href: "/meal-log", isRoute: true },
   ];
 
   const handleGetStarted = () => {
@@ -36,15 +37,25 @@ const Navbar = () => {
           </a>
 
           <div className="hidden md:flex items-center gap-8">
-            {navLinks.map((link) => (
-              <a
-                key={link.name}
-                href={link.href}
-                className="text-muted-foreground hover:text-foreground font-medium transition-colors relative after:absolute after:bottom-0 after:left-0 after:w-0 after:h-0.5 after:bg-primary after:transition-all hover:after:w-full"
-              >
-                {link.name}
-              </a>
-            ))}
+            {navLinks.map((link) =>
+              (link as any).isRoute ? (
+                <button
+                  key={link.name}
+                  onClick={() => navigate(link.href)}
+                  className="text-muted-foreground hover:text-foreground font-medium transition-colors relative after:absolute after:bottom-0 after:left-0 after:w-0 after:h-0.5 after:bg-primary after:transition-all hover:after:w-full"
+                >
+                  {link.name}
+                </button>
+              ) : (
+                <a
+                  key={link.name}
+                  href={link.href}
+                  className="text-muted-foreground hover:text-foreground font-medium transition-colors relative after:absolute after:bottom-0 after:left-0 after:w-0 after:h-0.5 after:bg-primary after:transition-all hover:after:w-full"
+                >
+                  {link.name}
+                </a>
+              )
+            )}
           </div>
 
           <div className="hidden md:flex items-center gap-3">
@@ -58,16 +69,26 @@ const Navbar = () => {
         {isOpen && (
           <div className="md:hidden py-4 border-t border-border/50 animate-fade-in">
             <div className="flex flex-col gap-4">
-              {navLinks.map((link) => (
-                <a
-                  key={link.name}
-                  href={link.href}
-                  className="text-muted-foreground hover:text-foreground font-medium py-2 transition-colors"
-                  onClick={() => setIsOpen(false)}
-                >
-                  {link.name}
-                </a>
-              ))}
+              {navLinks.map((link) =>
+                (link as any).isRoute ? (
+                  <button
+                    key={link.name}
+                    onClick={() => { navigate(link.href); setIsOpen(false); }}
+                    className="text-muted-foreground hover:text-foreground font-medium py-2 transition-colors text-left"
+                  >
+                    {link.name}
+                  </button>
+                ) : (
+                  <a
+                    key={link.name}
+                    href={link.href}
+                    className="text-muted-foreground hover:text-foreground font-medium py-2 transition-colors"
+                    onClick={() => setIsOpen(false)}
+                  >
+                    {link.name}
+                  </a>
+                )
+              )}
             </div>
           </div>
         )}

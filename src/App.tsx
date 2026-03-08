@@ -7,6 +7,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import DoshaQuiz from "./pages/DoshaQuiz";
+import MealLog from "./pages/MealLog";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -22,6 +23,7 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/dosha-quiz" element={<DoshaQuiz />} />
+            <Route path="/meal-log" element={<MealLog />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
