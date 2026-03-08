@@ -19,6 +19,8 @@ const Profile = () => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(true);
+  const { logs, isLoading: logsLoading, deleteLog } = useMealLogs();
+  const [isFetching, setIsFetching] = useState(true);
 
   const [fullName, setFullName] = useState("");
   const [dateOfBirth, setDateOfBirth] = useState("");
