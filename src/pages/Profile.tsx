@@ -9,10 +9,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { User, ArrowLeft, Save, Utensils } from "lucide-react";
+import { User, ArrowLeft, Save, Utensils, ClipboardList } from "lucide-react";
 import { useMealLogs } from "@/hooks/useMealLogs";
+import { useMealPlans } from "@/hooks/useMealPlans";
 import MealLogHistory from "@/components/MealLogHistory";
 import NutritionProgressChart from "@/components/NutritionProgressChart";
+import ActiveMealPlanView from "@/components/ActiveMealPlanView";
+import MealReminders from "@/components/MealReminders";
 
 const Profile = () => {
   const { user, username, refreshProfile } = useAuth();
