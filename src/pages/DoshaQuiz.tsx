@@ -75,22 +75,6 @@ const DoshaQuiz = () => {
     }
   };
 
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <Card className="max-w-md w-full text-center">
-          <CardContent className="pt-8 pb-8 space-y-4">
-            <Leaf className="w-12 h-12 text-primary mx-auto" />
-            <h2 className="font-serif text-2xl font-bold text-foreground">Sign In Required</h2>
-            <p className="text-muted-foreground">Please sign in to take the Dosha Quiz and get personalized Ayurvedic recommendations.</p>
-            <Button variant="hero" onClick={() => navigate("/auth")}>
-              Sign In to Continue
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
 
   if (result) {
     return <DoshaResult result={result} onRetake={() => {
