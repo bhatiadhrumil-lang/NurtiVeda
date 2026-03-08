@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
+import CompleteProfile from "./pages/CompleteProfile";
 import DoshaQuiz from "./pages/DoshaQuiz";
 import MealLog from "./pages/MealLog";
 import NotFound from "./pages/NotFound";
