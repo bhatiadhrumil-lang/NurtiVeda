@@ -14,6 +14,7 @@ const Navbar = () => {
     { name: "Analyze", href: "#analyze" },
     { name: "Diets", href: "#diets" },
     { name: "Ayurveda", href: "#ayurveda" },
+    { name: "Meal Log", href: "/meal-log", isRoute: true },
   ];
 
   const handleGetStarted = () => {
