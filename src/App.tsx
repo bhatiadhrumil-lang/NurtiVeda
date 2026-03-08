@@ -10,6 +10,7 @@ import CompleteProfile from "./pages/CompleteProfile";
 import Profile from "./pages/Profile";
 import DoshaQuiz from "./pages/DoshaQuiz";
 import MealLog from "./pages/MealLog";
+import MealPlans from "./pages/MealPlans";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
