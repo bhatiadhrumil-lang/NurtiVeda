@@ -23,7 +23,10 @@ const Profile = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(true);
   const { logs, isLoading: logsLoading, deleteLog } = useMealLogs();
-
+  const {
+    activePlan, reminders, isLoading: plansLoading,
+    deactivatePlan, addReminder, toggleReminder, deleteReminder,
+  } = useMealPlans();
   const [fullName, setFullName] = useState("");
   const [dateOfBirth, setDateOfBirth] = useState("");
   const [gender, setGender] = useState("");
