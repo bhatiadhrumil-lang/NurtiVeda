@@ -10,6 +10,7 @@ import CompleteProfile from "./pages/CompleteProfile";
 import Profile from "./pages/Profile";
 import DoshaQuiz from "./pages/DoshaQuiz";
 import MealLog from "./pages/MealLog";
+import MealPlans from "./pages/MealPlans";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -28,6 +29,7 @@ const App = () => (
             <Route path="/profile" element={<Profile />} />
             <Route path="/dosha-quiz" element={<DoshaQuiz />} />
             <Route path="/meal-log" element={<MealLog />} />
+            <Route path="/meal-plans" element={<MealPlans />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

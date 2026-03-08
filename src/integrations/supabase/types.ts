@@ -98,6 +98,87 @@ export type Database = {
         }
         Relationships: []
       }
+      meal_plans: {
+        Row: {
+          carbs_ratio: number
+          created_at: string
+          daily_calories: number
+          description: string | null
+          diet_type: string
+          fat_ratio: number
+          foods: Json | null
+          goal: string
+          id: string
+          meals_per_day: number
+          name: string
+          protein_ratio: number
+          sample_meals: Json | null
+          substitutions: Json | null
+          tips: string[] | null
+        }
+        Insert: {
+          carbs_ratio?: number
+          created_at?: string
+          daily_calories: number
+          description?: string | null
+          diet_type: string
+          fat_ratio?: number
+          foods?: Json | null
+          goal: string
+          id?: string
+          meals_per_day?: number
+          name: string
+          protein_ratio?: number
+          sample_meals?: Json | null
+          substitutions?: Json | null
+          tips?: string[] | null
+        }
+        Update: {
+          carbs_ratio?: number
+          created_at?: string
+          daily_calories?: number
+          description?: string | null
+          diet_type?: string
+          fat_ratio?: number
+          foods?: Json | null
+          goal?: string
+          id?: string
+          meals_per_day?: number
+          name?: string
+          protein_ratio?: number
+          sample_meals?: Json | null
+          substitutions?: Json | null
+          tips?: string[] | null
+        }
+        Relationships: []
+      }
+      meal_reminders: {
+        Row: {
+          created_at: string
+          id: string
+          is_enabled: boolean
+          meal_type: string
+          reminder_time: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_enabled?: boolean
+          meal_type: string
+          reminder_time: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_enabled?: boolean
+          meal_type?: string
+          reminder_time?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
@@ -136,6 +217,59 @@ export type Database = {
           weight?: number | null
         }
         Relationships: []
+      }
+      user_meal_plans: {
+        Row: {
+          carbs_grams: number
+          created_at: string
+          daily_calorie_target: number
+          fat_grams: number
+          id: string
+          is_active: boolean
+          meal_plan_id: string
+          progress_notes: string[] | null
+          protein_grams: number
+          start_date: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          carbs_grams: number
+          created_at?: string
+          daily_calorie_target: number
+          fat_grams: number
+          id?: string
+          is_active?: boolean
+          meal_plan_id: string
+          progress_notes?: string[] | null
+          protein_grams: number
+          start_date?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          carbs_grams?: number
+          created_at?: string
+          daily_calorie_target?: number
+          fat_grams?: number
+          id?: string
+          is_active?: boolean
+          meal_plan_id?: string
+          progress_notes?: string[] | null
+          protein_grams?: number
+          start_date?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_meal_plans_meal_plan_id_fkey"
+            columns: ["meal_plan_id"]
+            isOneToOne: false
+            referencedRelation: "meal_plans"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {

@@ -9,10 +9,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { User, ArrowLeft, Save, Utensils } from "lucide-react";
+import { User, ArrowLeft, Save, Utensils, ClipboardList } from "lucide-react";
 import { useMealLogs } from "@/hooks/useMealLogs";
+import { useMealPlans } from "@/hooks/useMealPlans";
 import MealLogHistory from "@/components/MealLogHistory";
 import NutritionProgressChart from "@/components/NutritionProgressChart";
+import ActiveMealPlanView from "@/components/ActiveMealPlanView";
+import MealReminders from "@/components/MealReminders";
 
 const Profile = () => {
   const { user, username, refreshProfile } = useAuth();
@@ -20,7 +23,10 @@ const Profile = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(true);
   const { logs, isLoading: logsLoading, deleteLog } = useMealLogs();
-
+  const {
+    activePlan, reminders, isLoading: plansLoading,
+    deactivatePlan, addReminder, toggleReminder, deleteReminder,
+  } = useMealPlans();
   const [fullName, setFullName] = useState("");
   const [dateOfBirth, setDateOfBirth] = useState("");
   const [gender, setGender] = useState("");
@@ -102,14 +108,18 @@ const Profile = () => {
         </Button>
 
         <Tabs defaultValue="profile" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 mb-6">
+          <TabsList className="grid w-full grid-cols-3 mb-6">
             <TabsTrigger value="profile" className="flex items-center gap-2">
               <User className="w-4 h-4" />
-              Profile Settings
+              Profile
+            </TabsTrigger>
+            <TabsTrigger value="meal-plan" className="flex items-center gap-2">
+              <ClipboardList className="w-4 h-4" />
+              Meal Plan
             </TabsTrigger>
             <TabsTrigger value="meals" className="flex items-center gap-2">
               <Utensils className="w-4 h-4" />
-              Meal History
+              History
             </TabsTrigger>
           </TabsList>
 
@@ -216,6 +226,33 @@ const Profile = () => {
                 </form>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="meal-plan" className="space-y-6">
+            {activePlan ? (
+              <>
+                <ActiveMealPlanView userPlan={activePlan} onDeactivate={deactivatePlan} />
+                <MealReminders
+                  reminders={reminders}
+                  onAdd={addReminder}
+                  onToggle={toggleReminder}
+                  onDelete={deleteReminder}
+                />
+              </>
+            ) : (
+              <Card className="border-border/50 shadow-lg">
+                <CardContent className="py-12 text-center">
+                  <ClipboardList className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-serif font-semibold mb-2">No Meal Plan Selected</h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Choose a personalized meal plan tailored to your weight and height.
+                  </p>
+                  <Button onClick={() => navigate("/meal-plans")}>
+                    Browse Meal Plans
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
 
           <TabsContent value="meals" className="space-y-6">
