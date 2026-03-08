@@ -228,6 +228,33 @@ const Profile = () => {
             </Card>
           </TabsContent>
 
+          <TabsContent value="meal-plan" className="space-y-6">
+            {activePlan ? (
+              <>
+                <ActiveMealPlanView userPlan={activePlan} onDeactivate={deactivatePlan} />
+                <MealReminders
+                  reminders={reminders}
+                  onAdd={addReminder}
+                  onToggle={toggleReminder}
+                  onDelete={deleteReminder}
+                />
+              </>
+            ) : (
+              <Card className="border-border/50 shadow-lg">
+                <CardContent className="py-12 text-center">
+                  <ClipboardList className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-serif font-semibold mb-2">No Meal Plan Selected</h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Choose a personalized meal plan tailored to your weight and height.
+                  </p>
+                  <Button onClick={() => navigate("/meal-plans")}>
+                    Browse Meal Plans
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
           <TabsContent value="meals" className="space-y-6">
             <Card className="border-border/50 shadow-lg">
               <CardHeader>
