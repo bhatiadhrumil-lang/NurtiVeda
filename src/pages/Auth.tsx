@@ -26,8 +26,10 @@ const Auth = () => {
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    if (user) navigate("/");
-  }, [user, navigate]);
+    if (user) {
+      navigate(profileCompleted ? "/" : "/complete-profile");
+    }
+  }, [user, profileCompleted, navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
