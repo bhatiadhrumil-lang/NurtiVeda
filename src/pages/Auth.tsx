@@ -14,7 +14,7 @@ import { useEffect } from "react";
 const Auth = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, profileCompleted } = useAuth();
 
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
@@ -26,8 +26,10 @@ const Auth = () => {
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    if (user) navigate("/");
-  }, [user, navigate]);
+    if (user) {
+      navigate(profileCompleted ? "/" : "/complete-profile");
+    }
+  }, [user, profileCompleted, navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,7 +43,6 @@ const Auth = () => {
       toast({ title: "Login failed", description: error.message, variant: "destructive" });
     } else {
       toast({ title: "Welcome back!", description: "You've logged in successfully." });
-      navigate("/");
     }
   };
 

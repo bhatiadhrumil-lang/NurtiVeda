@@ -101,21 +101,39 @@ export type Database = {
       profiles: {
         Row: {
           created_at: string
+          date_of_birth: string | null
           email: string | null
+          full_name: string | null
+          gender: string | null
+          height: number | null
           id: string
+          profile_completed: boolean
           username: string
+          weight: number | null
         }
         Insert: {
           created_at?: string
+          date_of_birth?: string | null
           email?: string | null
+          full_name?: string | null
+          gender?: string | null
+          height?: number | null
           id: string
+          profile_completed?: boolean
           username: string
+          weight?: number | null
         }
         Update: {
           created_at?: string
+          date_of_birth?: string | null
           email?: string | null
+          full_name?: string | null
+          gender?: string | null
+          height?: number | null
           id?: string
+          profile_completed?: boolean
           username?: string
+          weight?: number | null
         }
         Relationships: []
       }

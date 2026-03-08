@@ -7,7 +7,9 @@ interface AuthContextType {
   session: Session | null;
   loading: boolean;
   username: string | null;
+  profileCompleted: boolean;
   signOut: () => Promise<void>;
+  refreshProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -15,7 +17,9 @@ const AuthContext = createContext<AuthContextType>({
   session: null,
   loading: true,
   username: null,
+  profileCompleted: false,
   signOut: async () => {},
+  refreshProfile: async () => {},
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -25,14 +29,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [username, setUsername] = useState<string | null>(null);
+  const [profileCompleted, setProfileCompleted] = useState(false);
 
-  const fetchUsername = async (userId: string) => {
+  const fetchProfile = async (userId: string) => {
     const { data } = await supabase
       .from("profiles")
-      .select("username")
+      .select("username, profile_completed")
       .eq("id", userId)
       .single();
-    if (data) setUsername(data.username);
+    if (data) {
+      setUsername(data.username);
+      setProfileCompleted(data.profile_completed ?? false);
+    }
+  };
+
+  const refreshProfile = async () => {
+    if (user) await fetchProfile(user.id);
   };
 
   useEffect(() => {
@@ -41,9 +53,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setSession(session);
         setUser(session?.user ?? null);
         if (session?.user) {
-          setTimeout(() => fetchUsername(session.user.id), 0);
+          setTimeout(() => fetchProfile(session.user.id), 0);
         } else {
           setUsername(null);
+          setProfileCompleted(false);
         }
         setLoading(false);
       }
@@ -52,7 +65,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
-      if (session?.user) fetchUsername(session.user.id);
+      if (session?.user) fetchProfile(session.user.id);
       setLoading(false);
     });
 
@@ -64,7 +77,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, username, signOut }}>
+    <AuthContext.Provider value={{ user, session, loading, username, profileCompleted, signOut, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   );
