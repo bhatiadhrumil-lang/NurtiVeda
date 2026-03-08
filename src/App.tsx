@@ -7,6 +7,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import CompleteProfile from "./pages/CompleteProfile";
+import Profile from "./pages/Profile";
 import DoshaQuiz from "./pages/DoshaQuiz";
 import MealLog from "./pages/MealLog";
 import NotFound from "./pages/NotFound";
@@ -24,6 +25,7 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/complete-profile" element={<CompleteProfile />} />
+            <Route path="/profile" element={<Profile />} />
             <Route path="/dosha-quiz" element={<DoshaQuiz />} />
             <Route path="/meal-log" element={<MealLog />} />
             <Route path="*" element={<NotFound />} />
