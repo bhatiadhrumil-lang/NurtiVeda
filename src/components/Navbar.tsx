@@ -68,21 +68,6 @@ const Navbar = () => {
                   {link.name}
                 </a>
               ))}
-              {user ? (
-                <>
-                  <span className="text-sm text-muted-foreground flex items-center gap-1.5">
-                    <User className="w-4 h-4" />
-                    {username || "User"}
-                  </span>
-                  <Button variant="outline" size="default" onClick={handleSignOut}>
-                    <LogOut className="w-4 h-4 mr-1" /> Logout
-                  </Button>
-                </>
-              ) : (
-                <Button variant="hero" size="default" onClick={handleGetStarted}>
-                  Get Started
-                </Button>
-              )}
             </div>
           </div>
         )}
