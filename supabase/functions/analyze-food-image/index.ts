@@ -20,13 +20,7 @@ serve(async (req) => {
       );
     }
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      return new Response(
-        JSON.stringify({ error: "AI service is not configured" }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    const GOOGLE_API_KEY = "mAQ.Ab8RN6IimMiM8FujoFTphmP6aLZe8hp5_e8U9CSwr1kjSCD3mA";
 
     console.log("Analyzing food image...");
 
@@ -58,10 +52,10 @@ Always respond with valid JSON in this exact structure:
 
 Be as accurate as possible with portion estimates. If you cannot identify a food item clearly, mention that in the summary.`;
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const response = await fetch("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        Authorization: `Bearer ${GOOGLE_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
