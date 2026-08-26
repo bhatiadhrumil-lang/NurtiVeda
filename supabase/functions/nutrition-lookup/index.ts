@@ -11,7 +11,7 @@ serve(async (req) => {
   }
 
   try {
-    const { foodQuery } = await req.json();
+    const { foodQuery, apiKey } = await req.json();
 
     if (!foodQuery) {
       return new Response(
@@ -20,12 +20,10 @@ serve(async (req) => {
       );
     }
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      console.error("LOVABLE_API_KEY is not configured");
+    if (!apiKey) {
       return new Response(
-        JSON.stringify({ error: "AI service is not configured" }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ error: 'Google API key is required' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -82,7 +80,7 @@ Use accurate nutritional data. If exact values are unknown, provide reasonable e
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -97,7 +95,7 @@ Use accurate nutritional data. If exact values are unknown, provide reasonable e
     if (!response.ok) {
       const errorText = await response.text();
       console.error("AI gateway error:", response.status, errorText);
-      
+
       if (response.status === 429) {
         return new Response(
           JSON.stringify({ error: "Rate limit exceeded. Please try again later." }),
@@ -110,7 +108,7 @@ Use accurate nutritional data. If exact values are unknown, provide reasonable e
           { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
-      
+
       return new Response(
         JSON.stringify({ error: "Failed to get nutrition data" }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

@@ -11,7 +11,7 @@ serve(async (req) => {
   }
 
   try {
-    const { imageBase64 } = await req.json();
+    const { imageBase64, apiKey } = await req.json();
 
     if (!imageBase64) {
       return new Response(
@@ -20,7 +20,12 @@ serve(async (req) => {
       );
     }
 
-    const GOOGLE_API_KEY = "mAQ.Ab8RN6IimMiM8FujoFTphmP6aLZe8hp5_e8U9CSwr1kjSCD3mA";
+    if (!apiKey) {
+      return new Response(
+        JSON.stringify({ error: 'Google API key is required' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     console.log("Analyzing food image...");
 
@@ -55,7 +60,7 @@ Be as accurate as possible with portion estimates. If you cannot identify a food
     const response = await fetch("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${GOOGLE_API_KEY}`,
+        Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({

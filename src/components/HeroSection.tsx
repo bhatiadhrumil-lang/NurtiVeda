@@ -1,11 +1,10 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Camera, Search, Sparkles, Upload, Loader2 } from "lucide-react";
 import { useNutritionLookup } from "@/hooks/useNutritionLookup";
 import NutritionResult from "@/components/NutritionResult";
 import PhotoAnalysisResult, { type PhotoAnalysisData } from "@/components/PhotoAnalysisResult";
-import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
 const HeroSection = () => {
@@ -45,17 +44,95 @@ const HeroSection = () => {
         reader.readAsDataURL(file);
       });
 
-      const { data, error } = await supabase.functions.invoke("analyze-food-image", {
-        body: { imageBase64: base64 },
-      });
+      const systemPrompt = `You are a nutrition and food recognition expert. When given an image, identify ALL food items visible and provide a detailed nutritional summary.
 
-      if (error) throw error;
-      if (data.error) throw new Error(data.error);
+Always respond with valid JSON in this exact structure:
+{
+  "foods": [
+    {
+      "name": "food item name",
+      "estimatedPortion": "estimated portion size",
+      "calories": number,
+      "protein": number,
+      "carbs": number,
+      "fat": number
+    }
+  ],
+  "totalEstimate": {
+    "calories": number,
+    "protein": number,
+    "carbs": number,
+    "fat": number,
+    "fiber": number
+  },
+  "summary": "A brief 2-3 sentence summary of the meal, its nutritional quality, and any health tips.",
+  "healthScore": number (1-10 rating of overall healthiness),
+  "suggestions": ["suggestion 1 for improving the meal", "suggestion 2"]
+}
 
-      if (data.success && data.data) {
-        setAnalysisData(data.data);
-        toast({ title: "Photo analyzed!", description: "Food items identified successfully." });
+Be as accurate as possible with portion estimates. If you cannot identify a food item clearly, mention that in the summary.`;
+
+      const apiKey = import.meta.env.VITE_GEMINI_API_KEY as string | undefined;
+      if (!apiKey) {
+        throw new Error("Missing VITE_GEMINI_API_KEY. Add it to your environment variables.");
       }
+
+      const imageData = base64.split(",")[1] || base64;
+
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            contents: [
+              {
+                role: "user",
+                parts: [
+                  { text: systemPrompt },
+                  {
+                    text: "Identify the food items in this image and provide detailed nutritional analysis.",
+                  },
+                  {
+                    inline_data: {
+                      mime_type: file.type || "image/png",
+                      data: imageData,
+                    },
+                  },
+                ],
+              },
+            ],
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("AI gateway error:", response.status, errorText);
+
+        throw new Error("Failed to analyze image");
+      }
+
+      const data = await response.json();
+      const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
+
+      if (!content) {
+        throw new Error("No analysis received");
+      }
+
+      let analysisData;
+      try {
+        const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/) || [null, content];
+        analysisData = JSON.parse(jsonMatch[1].trim());
+      } catch (parseError) {
+        console.error("Failed to parse analysis:", parseError);
+        throw new Error("Failed to parse analysis");
+      }
+
+      setAnalysisData(analysisData);
+      toast({ title: "Photo analyzed!", description: "Food items identified successfully." });
     } catch (error) {
       console.error("Error analyzing photo:", error);
       toast({
@@ -86,6 +163,37 @@ const HeroSection = () => {
     setAnalysisData(null);
     setPreviewUrl("");
   };
+
+  // Always-fresh reference to the latest processFile, so the window-level
+  // drop listener below can stay mounted for the component's whole life.
+  const processFileRef = useRef(processFile);
+  useEffect(() => {
+    processFileRef.current = processFile;
+  });
+
+  // Global drop guard: without this, dropping outside the small dashed box
+  // makes the browser navigate away to open the image (or do nothing).
+  // With it, ANY drop position on the page is accepted.
+  useEffect(() => {
+    const hasFiles = (e: DragEvent) => e.dataTransfer?.types.includes("Files");
+    const prevent = (e: DragEvent) => {
+      if (hasFiles(e)) e.preventDefault();
+    };
+    const handleDrop = (e: DragEvent) => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      // Ignore drops that already landed on the dedicated drop zone
+      if ((e.target as HTMLElement)?.closest?.('[data-dropzone]')) return;
+      const file = e.dataTransfer?.files?.[0];
+      if (file) processFileRef.current(file);
+    };
+    window.addEventListener("dragover", prevent);
+    window.addEventListener("drop", handleDrop);
+    return () => {
+      window.removeEventListener("dragover", prevent);
+      window.removeEventListener("drop", handleDrop);
+    };
+  }, []);
 
   return (
     <section id="home" className="relative min-h-screen pt-24 pb-16 overflow-hidden">
@@ -149,6 +257,7 @@ const HeroSection = () => {
             onClick={() => !isAnalyzing && fileInputRef.current?.click()}
           >
             <div
+              data-dropzone
               className={`relative p-8 md:p-12 rounded-2xl border-2 border-dashed transition-all duration-300 cursor-pointer group ${
                 isDragging
                   ? "border-primary bg-primary/5"

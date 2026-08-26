@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
 export interface NutritionData {
@@ -48,25 +47,109 @@ export const useNutritionLookup = () => {
     setNutritionData(null);
 
     try {
-      const { data, error } = await supabase.functions.invoke("nutrition-lookup", {
-        body: { foodQuery: foodQuery.trim() },
+      const apiKey = import.meta.env.VITE_GEMINI_API_KEY as string | undefined;
+      if (!apiKey) {
+        throw new Error("Missing VITE_GEMINI_API_KEY. Add it to your environment variables.");
+      }
+
+      const systemPrompt = `You are a nutrition expert. When given a food item, provide detailed nutritional information per 100 grams in JSON format.
+
+Always respond with valid JSON in this exact structure:
+{
+  "foodName": "the food name",
+  "description": "brief description of the food",
+  "servingSize": "100g",
+  "macronutrients": {
+    "calories": { "value": number, "unit": "kcal" },
+    "protein": { "value": number, "unit": "g" },
+    "carbohydrates": { "value": number, "unit": "g" },
+    "fiber": { "value": number, "unit": "g" },
+    "sugar": { "value": number, "unit": "g" },
+    "fat": { "value": number, "unit": "g" },
+    "saturatedFat": { "value": number, "unit": "g" },
+    "unsaturatedFat": { "value": number, "unit": "g" }
+  },
+  "micronutrients": {
+    "vitamins": [
+      { "name": "Vitamin A", "value": number, "unit": "mcg", "dailyValue": "percentage" },
+      { "name": "Vitamin C", "value": number, "unit": "mg", "dailyValue": "percentage" },
+      { "name": "Vitamin D", "value": number, "unit": "mcg", "dailyValue": "percentage" },
+      { "name": "Vitamin E", "value": number, "unit": "mg", "dailyValue": "percentage" },
+      { "name": "Vitamin K", "value": number, "unit": "mcg", "dailyValue": "percentage" },
+      { "name": "Vitamin B6", "value": number, "unit": "mg", "dailyValue": "percentage" },
+      { "name": "Vitamin B12", "value": number, "unit": "mcg", "dailyValue": "percentage" }
+    ],
+    "minerals": [
+      { "name": "Calcium", "value": number, "unit": "mg", "dailyValue": "percentage" },
+      { "name": "Iron", "value": number, "unit": "mg", "dailyValue": "percentage" },
+      { "name": "Magnesium", "value": number, "unit": "mg", "dailyValue": "percentage" },
+      { "name": "Phosphorus", "value": number, "unit": "mg", "dailyValue": "percentage" },
+      { "name": "Potassium", "value": number, "unit": "mg", "dailyValue": "percentage" },
+      { "name": "Sodium", "value": number, "unit": "mg", "dailyValue": "percentage" },
+      { "name": "Zinc", "value": number, "unit": "mg", "dailyValue": "percentage" }
+    ]
+  },
+  "healthBenefits": ["benefit 1", "benefit 2", "benefit 3"],
+  "ayurvedicProperties": {
+    "dosha": "which doshas it balances (Vata/Pitta/Kapha)",
+    "taste": "rasa (sweet/sour/salty/bitter/pungent/astringent)",
+    "energy": "virya (heating/cooling)",
+    "postDigestive": "vipaka effect"
+  }
+}
+
+Use accurate nutritional data. If exact values are unknown, provide reasonable estimates based on similar foods. Include all vitamins and minerals listed above.`;
+
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            contents: [
+              {
+                role: "user",
+                parts: [
+                  { text: systemPrompt },
+                  { text: `Provide detailed nutritional information for: ${foodQuery.trim()}` },
+                ],
+              },
+            ],
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("AI gateway error:", response.status, errorText);
+        throw new Error(`Failed to get nutrition data (HTTP ${response.status})`);
+      }
+
+      const data = await response.json();
+      const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
+
+      if (!content) {
+        throw new Error("No nutrition data received");
+      }
+
+      let nutritionData;
+      try {
+        const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/) || [null, content];
+        const jsonStr = jsonMatch[1].trim();
+        nutritionData = JSON.parse(jsonStr);
+      } catch (parseError) {
+        console.error("Failed to parse nutrition data:", parseError);
+        console.log("Raw content:", content);
+        throw new Error("Failed to parse nutrition data");
+      }
+
+      setNutritionData(nutritionData);
+      toast({
+        title: "Nutrition data found!",
+        description: `Showing nutrition information for ${nutritionData.foodName}`,
       });
-
-      if (error) {
-        throw error;
-      }
-
-      if (data.error) {
-        throw new Error(data.error);
-      }
-
-      if (data.success && data.data) {
-        setNutritionData(data.data);
-        toast({
-          title: "Nutrition data found!",
-          description: `Showing nutrition information for ${data.data.foodName}`,
-        });
-      }
     } catch (error) {
       console.error("Error looking up nutrition:", error);
       toast({
