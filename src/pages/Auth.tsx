@@ -10,6 +10,7 @@ import { Leaf, Eye, EyeOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEffect } from "react";
+import { classifySignup, getAppUrl, toUserAuthMessage } from "@/lib/auth";
 
 const Auth = () => {
   const navigate = useNavigate();
@@ -26,6 +27,7 @@ const Auth = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [resetSent, setResetSent] = useState(false);
   const [resendSent, setResendSent] = useState(false);
+  const [signupNotice, setSignupNotice] = useState<string | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -42,7 +44,7 @@ const Auth = () => {
     });
     setIsLoading(false);
     if (error) {
-      toast({ title: "Login failed", description: error.message, variant: "destructive" });
+      toast({ title: "Login failed", description: toUserAuthMessage(error.message, "login"), variant: "destructive" });
     } else {
       toast({ title: "Welcome back!", description: "You've logged in successfully." });
     }
@@ -54,12 +56,14 @@ const Auth = () => {
       return;
     }
     setIsLoading(true);
+    // Verification/recovery links must land inside the app, including its
+    // /NurtiVeda/ subpath on GitHub Pages — never the bare domain root.
     const { error } = await supabase.auth.resetPasswordForEmail(loginEmail.trim(), {
-      redirectTo: window.location.origin,
+      redirectTo: getAppUrl("auth/callback"),
     });
     setIsLoading(false);
     if (error) {
-      toast({ title: "Reset failed", description: error.message, variant: "destructive" });
+      toast({ title: "Reset failed", description: toUserAuthMessage(error.message, "reset"), variant: "destructive" });
     } else {
       setResetSent(true);
       toast({ title: "Check your email", description: "Password reset link sent." });
@@ -75,7 +79,7 @@ const Auth = () => {
     const { error } = await supabase.auth.resend({ type: "signup", email: loginEmail.trim() });
     setIsLoading(false);
     if (error) {
-      toast({ title: "Resend failed", description: error.message, variant: "destructive" });
+      toast({ title: "Resend failed", description: toUserAuthMessage(error.message, "resend"), variant: "destructive" });
     } else {
       setResendSent(true);
       toast({ title: "Check your email", description: "Confirmation link sent. Click it, then log in." });
@@ -93,19 +97,30 @@ const Auth = () => {
       return;
     }
     setIsLoading(true);
-    const { error } = await supabase.auth.signUp({
+    setSignupNotice(null);
+    const { data, error } = await supabase.auth.signUp({
       email: signupEmail,
       password: signupPassword,
       options: {
         data: { username: signupUsername.trim() },
-        emailRedirectTo: window.location.origin,
+        emailRedirectTo: getAppUrl("auth/callback"),
       },
     });
     setIsLoading(false);
-    if (error) {
-      toast({ title: "Signup failed", description: error.message, variant: "destructive" });
+    // Never claim an email was sent unless Supabase confirms the outcome.
+    const outcome = classifySignup(data, error);
+    if (outcome.kind === "error") {
+      toast({ title: "Signup failed", description: outcome.message, variant: "destructive" });
+    } else if (outcome.kind === "already-registered") {
+      const msg = "This email is already registered — no new verification email was sent. Sign in, or resend the confirmation from the Login tab.";
+      setSignupNotice(msg);
+      toast({ title: "Already registered", description: msg });
+    } else if (outcome.kind === "confirmed") {
+      toast({ title: "Account created!", description: "You're signed in — welcome to NutriVeda." });
     } else {
-      toast({ title: "Account created!", description: "Please check your email to verify your account." });
+      const msg = `Account created for ${signupEmail}. Please click the verification link in your email (check spam), then sign in.`;
+      setSignupNotice(msg);
+      toast({ title: "Check your email to verify", description: msg });
     }
   };
 
@@ -236,6 +251,11 @@ const Auth = () => {
                   <Button type="submit" variant="hero" className="w-full" disabled={isLoading}>
                     {isLoading ? "Creating account..." : "Sign Up"}
                   </Button>
+                  {signupNotice && (
+                    <p className="text-sm text-muted-foreground bg-muted/50 border border-border/50 rounded-lg px-3 py-2">
+                      {signupNotice}
+                    </p>
+                  )}
                 </form>
               </TabsContent>
             </CardContent>

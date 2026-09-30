@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { Skeleton } from "@/components/ui/skeleton";
+import { getBasename } from "@/lib/auth";
 
 const Index = lazy(() => import("./pages/Index"));
 const Auth = lazy(() => import("./pages/Auth"));
@@ -15,6 +16,7 @@ const Profile = lazy(() => import("./pages/Profile"));
 const DoshaQuiz = lazy(() => import("./pages/DoshaQuiz"));
 const MealLog = lazy(() => import("./pages/MealLog"));
 const MealPlans = lazy(() => import("./pages/MealPlans"));
+const AuthCallback = lazy(() => import("./pages/AuthCallback"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient();
@@ -35,11 +37,12 @@ const App = () => (
         <Toaster />
         <Sonner />
         <ErrorBoundary>
-          <BrowserRouter basename="/NurtiVeda">
+          <BrowserRouter basename={getBasename()}>
             <Suspense fallback={<PageFallback />}>
               <Routes>
                 <Route path="/" element={<Index />} />
                 <Route path="/auth" element={<Auth />} />
+                <Route path="/auth/callback" element={<AuthCallback />} />
                 <Route path="/complete-profile" element={<CompleteProfile />} />
                 <Route path="/profile" element={<Profile />} />
                 <Route path="/dosha-quiz" element={<DoshaQuiz />} />
