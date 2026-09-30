@@ -7,6 +7,12 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # Unit tests import the Supabase client module (client construction only,
+    # no network). These dummy values satisfy construction in CI; the real
+    # public values are injected only at Pages build time in deploy.yml.
+    env:
+      VITE_SUPABASE_URL: https://example.supabase.co
+      VITE_SUPABASE_PUBLISHABLE_KEY: ci-dummy-key
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
