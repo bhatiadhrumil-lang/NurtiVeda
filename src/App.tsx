@@ -35,7 +35,7 @@ const App = () => (
         <Toaster />
         <Sonner />
         <ErrorBoundary>
-          <BrowserRouter>
+          <BrowserRouter basename="/NurtiVeda">
             <Suspense fallback={<PageFallback />}>
               <Routes>
                 <Route path="/" element={<Index />} />
