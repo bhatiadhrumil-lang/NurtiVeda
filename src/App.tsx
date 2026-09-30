@@ -1,19 +1,32 @@
+import { Suspense, lazy } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
-import Index from "./pages/Index";
-import Auth from "./pages/Auth";
-import CompleteProfile from "./pages/CompleteProfile";
-import Profile from "./pages/Profile";
-import DoshaQuiz from "./pages/DoshaQuiz";
-import MealLog from "./pages/MealLog";
-import MealPlans from "./pages/MealPlans";
-import NotFound from "./pages/NotFound";
+import ErrorBoundary from "@/components/ErrorBoundary";
+import { Skeleton } from "@/components/ui/skeleton";
+
+const Index = lazy(() => import("./pages/Index"));
+const Auth = lazy(() => import("./pages/Auth"));
+const CompleteProfile = lazy(() => import("./pages/CompleteProfile"));
+const Profile = lazy(() => import("./pages/Profile"));
+const DoshaQuiz = lazy(() => import("./pages/DoshaQuiz"));
+const MealLog = lazy(() => import("./pages/MealLog"));
+const MealPlans = lazy(() => import("./pages/MealPlans"));
+const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient();
+
+const PageFallback = () => (
+  <div className="min-h-screen bg-background p-8">
+    <div className="max-w-4xl mx-auto space-y-4">
+      <Skeleton className="h-10 w-48" />
+      <Skeleton className="h-64 w-full" />
+    </div>
+  </div>
+);
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -21,18 +34,22 @@ const App = () => (
       <TooltipProvider>
         <Toaster />
         <Sonner />
-        <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/auth" element={<Auth />} />
-            <Route path="/complete-profile" element={<CompleteProfile />} />
-            <Route path="/profile" element={<Profile />} />
-            <Route path="/dosha-quiz" element={<DoshaQuiz />} />
-            <Route path="/meal-log" element={<MealLog />} />
-            <Route path="/meal-plans" element={<MealPlans />} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
+        <ErrorBoundary>
+          <BrowserRouter>
+            <Suspense fallback={<PageFallback />}>
+              <Routes>
+                <Route path="/" element={<Index />} />
+                <Route path="/auth" element={<Auth />} />
+                <Route path="/complete-profile" element={<CompleteProfile />} />
+                <Route path="/profile" element={<Profile />} />
+                <Route path="/dosha-quiz" element={<DoshaQuiz />} />
+                <Route path="/meal-log" element={<MealLog />} />
+                <Route path="/meal-plans" element={<MealPlans />} />
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </Suspense>
+          </BrowserRouter>
+        </ErrorBoundary>
       </TooltipProvider>
     </AuthProvider>
   </QueryClientProvider>

@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { User, ArrowLeft, Save, Utensils, ClipboardList } from "lucide-react";
 import { useMealLogs } from "@/hooks/useMealLogs";
 import { useMealPlans } from "@/hooks/useMealPlans";
+import { getActivityLevel, setActivityLevel, ACTIVITY_OPTIONS, kgToLb, lbToKg, cmToIn, inToCm } from "@/lib/health";
 import MealLogHistory from "@/components/MealLogHistory";
 import NutritionProgressChart from "@/components/NutritionProgressChart";
 import ActiveMealPlanView from "@/components/ActiveMealPlanView";
@@ -33,6 +34,8 @@ const Profile = () => {
   const [weight, setWeight] = useState("");
   const [height, setHeight] = useState("");
   const [email, setEmail] = useState("");
+  const [units, setUnits] = useState<"metric" | "imperial">("metric");
+  const [activity, setActivity] = useState(() => getActivityLevel());
 
   useEffect(() => {
     if (!user) {
@@ -67,20 +70,24 @@ const Profile = () => {
     if (!user) return;
 
     setIsLoading(true);
+    // Convert back to metric before saving
+    const weightKg = units === "imperial" && weight ? String(lbToKg(Number(weight))) : weight;
+    const heightCm = units === "imperial" && height ? String(inToCm(Number(height))) : height;
     const { error } = await supabase
       .from("profiles")
       .update({
         full_name: fullName || null,
         date_of_birth: dateOfBirth || null,
         gender: gender || null,
-        weight: weight ? parseFloat(weight) : null,
-        height: height ? parseFloat(height) : null,
+        weight: weightKg ? parseFloat(weightKg) : null,
+        height: heightCm ? parseFloat(heightCm) : null,
       })
       .eq("id", user.id);
 
     if (error) {
       toast.error("Failed to update profile");
     } else {
+      setActivityLevel(activity);
       toast.success("Profile updated successfully!");
       await refreshProfile();
     }
@@ -196,26 +203,69 @@ const Profile = () => {
 
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="weight">Weight (kg)</Label>
+                      <Label htmlFor="weight">Weight ({units === "metric" ? "kg" : "lb"})</Label>
                       <Input
                         id="weight"
                         type="number"
                         step="0.1"
-                        placeholder="e.g., 70"
+                        placeholder={units === "metric" ? "e.g., 70" : "e.g., 154"}
                         value={weight}
                         onChange={(e) => setWeight(e.target.value)}
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="height">Height (cm)</Label>
+                      <Label htmlFor="height">Height ({units === "metric" ? "cm" : "in"})</Label>
                       <Input
                         id="height"
                         type="number"
                         step="0.1"
-                        placeholder="e.g., 175"
+                        placeholder={units === "metric" ? "e.g., 175" : "e.g., 69"}
                         value={height}
                         onChange={(e) => setHeight(e.target.value)}
                       />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="units">Units</Label>
+                      <Select
+                        value={units}
+                        onValueChange={(v: "metric" | "imperial") => {
+                          // Convert displayed values when switching
+                          if (v !== units) {
+                            if (v === "imperial") {
+                              if (weight) setWeight(String(kgToLb(Number(weight))));
+                              if (height) setHeight(String(cmToIn(Number(height))));
+                            } else {
+                              if (weight) setWeight(String(lbToKg(Number(weight))));
+                              if (height) setHeight(String(inToCm(Number(height))));
+                            }
+                          }
+                          setUnits(v);
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="metric">Metric (kg/cm)</SelectItem>
+                          <SelectItem value="imperial">Imperial (lb/in)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="activity">Activity level</Label>
+                      <Select value={activity} onValueChange={setActivity}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {ACTIVITY_OPTIONS.map((o) => (
+                            <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
 
@@ -267,7 +317,7 @@ const Profile = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <NutritionProgressChart logs={logs} />
+                <NutritionProgressChart logs={logs} calorieTarget={activePlan?.daily_calorie_target} />
               </CardContent>
             </Card>
 

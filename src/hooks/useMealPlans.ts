@@ -55,21 +55,31 @@ export interface MealReminder {
   is_enabled: boolean;
 }
 
-// Calculate BMR using Mifflin-St Jeor
-export const calculateBMR = (weight: number, height: number, gender: string): number => {
+// Mifflin-St Jeor with real age + activity multiplier.
+// BMR * activity = TDEE, then goal adjustment.
+export const calculateBMR = (weight: number, height: number, gender: string, age?: number | null): number => {
+  const a = age && age > 0 ? age : 30;
   if (gender === "female") {
-    return 10 * weight + 6.25 * height - 5 * 30 - 161; // Assume age 30
+    return 10 * weight + 6.25 * height - 5 * a - 161;
   }
-  return 10 * weight + 6.25 * height - 5 * 30 + 5;
+  return 10 * weight + 6.25 * height - 5 * a + 5;
 };
 
-export const calculateCalorieTarget = (bmr: number, goal: string): number => {
+export const calculateCalorieTarget = (bmr: number, goal: string, activityLevel?: string | null): number => {
+  const multipliers: Record<string, number> = {
+    sedentary: 1.2,
+    light: 1.375,
+    moderate: 1.55,
+    active: 1.725,
+  };
+  const activity = multipliers[activityLevel ?? ""] ?? 1.375;
+  const tdee = bmr * activity;
   switch (goal) {
-    case "weight_loss": return Math.round(bmr * 1.2 - 500);
-    case "muscle_gain": return Math.round(bmr * 1.5);
-    case "maintenance": return Math.round(bmr * 1.3);
-    case "health": return Math.round(bmr * 1.25);
-    default: return Math.round(bmr * 1.3);
+    case "weight_loss": return Math.round(tdee - 500);
+    case "muscle_gain": return Math.round(tdee + 250);
+    case "maintenance": return Math.round(tdee);
+    case "health": return Math.round(tdee - 100);
+    default: return Math.round(tdee);
   }
 };
 
@@ -83,21 +93,21 @@ export const useMealPlans = () => {
   const fetchPlans = useCallback(async () => {
     const { data } = await supabase.from("meal_plans").select("*");
     if (data) {
-      setPlans(data.map((d: any) => ({
-        id: d.id,
-        name: d.name,
-        description: d.description,
-        diet_type: d.diet_type,
-        goal: d.goal,
-        daily_calories: d.daily_calories,
-        protein_ratio: d.protein_ratio,
-        carbs_ratio: d.carbs_ratio,
-        fat_ratio: d.fat_ratio,
-        meals_per_day: d.meals_per_day,
-        tips: d.tips || [],
-        substitutions: Array.isArray(d.substitutions) ? d.substitutions : [],
-        foods: Array.isArray(d.foods) ? d.foods : [],
-        sample_meals: Array.isArray(d.sample_meals) ? d.sample_meals : [],
+      setPlans(data.map((d: Record<string, unknown>) => ({
+        id: String(d.id),
+        name: String(d.name ?? ""),
+        description: String(d.description ?? ""),
+        diet_type: String(d.diet_type ?? ""),
+        goal: String(d.goal ?? ""),
+        daily_calories: Number(d.daily_calories ?? 0),
+        protein_ratio: Number(d.protein_ratio ?? 0),
+        carbs_ratio: Number(d.carbs_ratio ?? 0),
+        fat_ratio: Number(d.fat_ratio ?? 0),
+        meals_per_day: Number(d.meals_per_day ?? 3),
+        tips: Array.isArray(d.tips) ? (d.tips as string[]) : [],
+        substitutions: Array.isArray(d.substitutions) ? (d.substitutions as Substitution[]) : [],
+        foods: Array.isArray(d.foods) ? (d.foods as string[]) : [],
+        sample_meals: Array.isArray(d.sample_meals) ? (d.sample_meals as SampleMeal[]) : [],
       })));
     }
   }, []);
@@ -153,11 +163,11 @@ export const useMealPlans = () => {
       .select("*")
       .eq("user_id", user.id);
     if (data) {
-      setReminders(data.map((r: any) => ({
-        id: r.id,
-        meal_type: r.meal_type,
-        reminder_time: r.reminder_time,
-        is_enabled: r.is_enabled,
+      setReminders(data.map((r: Record<string, unknown>) => ({
+        id: String(r.id),
+        meal_type: String(r.meal_type ?? "snack"),
+        reminder_time: String(r.reminder_time ?? ""),
+        is_enabled: Boolean(r.is_enabled),
       })));
     }
   }, [user]);
@@ -171,7 +181,7 @@ export const useMealPlans = () => {
     load();
   }, [fetchPlans, fetchActivePlan, fetchReminders]);
 
-  const selectPlan = async (planId: string, weight: number, height: number, gender: string) => {
+  const selectPlan = async (planId: string, weight: number, height: number, gender: string, age?: number | null, activityLevel?: string | null) => {
     if (!user) { toast.error("Please sign in first"); return; }
 
     const plan = plans.find(p => p.id === planId);
@@ -184,8 +194,8 @@ export const useMealPlans = () => {
       .eq("user_id", user.id)
       .eq("is_active", true);
 
-    const bmr = calculateBMR(weight, height, gender);
-    const calorieTarget = calculateCalorieTarget(bmr, plan.goal);
+    const bmr = calculateBMR(weight, height, gender, age);
+    const calorieTarget = calculateCalorieTarget(bmr, plan.goal, activityLevel);
     const proteinGrams = Math.round((calorieTarget * plan.protein_ratio) / 4);
     const carbsGrams = Math.round((calorieTarget * plan.carbs_ratio) / 4);
     const fatGrams = Math.round((calorieTarget * plan.fat_ratio) / 9);

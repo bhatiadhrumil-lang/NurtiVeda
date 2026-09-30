@@ -1,33 +1,71 @@
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Camera, Search, Sparkles, Upload, Loader2 } from "lucide-react";
+import { Camera, Search, Sparkles, Upload, Loader2, Barcode, History } from "lucide-react";
 import { useNutritionLookup } from "@/hooks/useNutritionLookup";
+import { useMealLogs } from "@/hooks/useMealLogs";
 import NutritionResult from "@/components/NutritionResult";
 import PhotoAnalysisResult, { type PhotoAnalysisData } from "@/components/PhotoAnalysisResult";
 import { useToast } from "@/hooks/use-toast";
+import { FunctionsHttpError } from "@supabase/supabase-js";
+import { supabase } from "@/integrations/supabase/client";
+import { compressFoodImage } from "@/lib/image-compression";
+import { dayKey, calcStreak } from "@/lib/health";
 
 const HeroSection = () => {
   const [searchQuery, setSearchQuery] = useState("");
+  const [barcode, setBarcode] = useState("");
+  const [showBarcode, setShowBarcode] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisData, setAnalysisData] = useState<PhotoAnalysisData | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // Guards against double-processing: some browsers/environments can deliver
+  // the same file twice (change + drop races, double dialogs), which used to
+  // pop the result/toast twice. Only one analysis runs at a time and a file
+  // that just succeeded within 3s is ignored. Nothing fails silently: the
+  // busy path toasts, and stale locks self-release after 90s.
+  const processingRef = useRef(false);
+  const lastFileRef = useRef<{ name: string; size: number; lastModified: number; at: number; ok: boolean } | null>(null);
   const { toast } = useToast();
-  const { isLoading, nutritionData, lookupNutrition, clearNutritionData } = useNutritionLookup();
+  const { isLoading, nutritionData, history, lookupNutrition, lookupByBarcode, clearNutritionData } = useNutritionLookup();
+  const { logs } = useMealLogs();
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
+    clearAnalysis();
     lookupNutrition(searchQuery);
   };
 
   const processFile = async (file: File) => {
+    // Self-healing: if a previous run never finished (unmount/HMR race),
+    // don't stay locked forever — release locks older than 90s.
+    if (processingRef.current) {
+      const startedAt = lastFileRef.current?.at ?? 0;
+      if (Date.now() - startedAt < 90_000) {
+        toast({ title: "Still analyzing", description: "Please wait for the current photo to finish." });
+        return;
+      }
+      processingRef.current = false;
+    }
+    const now = Date.now();
+    const last = lastFileRef.current;
+    if (last && last.name === file.name && last.size === file.size &&
+        last.lastModified === file.lastModified && now - last.at < 3000 && last.ok) {
+      // Same file successfully processed moments ago (double event) — ignore.
+      return;
+    }
+    processingRef.current = true;
+    lastFileRef.current = { name: file.name, size: file.size, lastModified: file.lastModified, at: now, ok: false };
+    clearNutritionData();
     if (!file.type.startsWith("image/")) {
+      processingRef.current = false;
       toast({ title: "Invalid file", description: "Please upload an image file (PNG, JPG).", variant: "destructive" });
       return;
     }
     if (file.size > 10 * 1024 * 1024) {
+      processingRef.current = false;
       toast({ title: "File too large", description: "Please upload an image under 10MB.", variant: "destructive" });
       return;
     }
@@ -37,101 +75,47 @@ const HeroSection = () => {
     setIsAnalyzing(true);
 
     try {
-      const reader = new FileReader();
-      const base64 = await new Promise<string>((resolve, reject) => {
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
+      const compressedImage = await compressFoodImage(file);
+      const { data, error } = await supabase.functions.invoke("analyze-food-image", {
+        body: { imageBase64: compressedImage.dataUrl, mimeType: compressedImage.mimeType },
       });
 
-      const systemPrompt = `You are a nutrition and food recognition expert. When given an image, identify ALL food items visible and provide a detailed nutritional summary.
-
-Always respond with valid JSON in this exact structure:
-{
-  "foods": [
-    {
-      "name": "food item name",
-      "estimatedPortion": "estimated portion size",
-      "calories": number,
-      "protein": number,
-      "carbs": number,
-      "fat": number
-    }
-  ],
-  "totalEstimate": {
-    "calories": number,
-    "protein": number,
-    "carbs": number,
-    "fat": number,
-    "fiber": number
-  },
-  "summary": "A brief 2-3 sentence summary of the meal, its nutritional quality, and any health tips.",
-  "healthScore": number (1-10 rating of overall healthiness),
-  "suggestions": ["suggestion 1 for improving the meal", "suggestion 2"]
-}
-
-Be as accurate as possible with portion estimates. If you cannot identify a food item clearly, mention that in the summary.`;
-
-      const apiKey = import.meta.env.VITE_GEMINI_API_KEY as string | undefined;
-      if (!apiKey) {
-        throw new Error("Missing VITE_GEMINI_API_KEY. Add it to your environment variables.");
-      }
-
-      const imageData = base64.split(",")[1] || base64;
-
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            contents: [
-              {
-                role: "user",
-                parts: [
-                  { text: systemPrompt },
-                  {
-                    text: "Identify the food items in this image and provide detailed nutritional analysis.",
-                  },
-                  {
-                    inline_data: {
-                      mime_type: file.type || "image/png",
-                      data: imageData,
-                    },
-                  },
-                ],
-              },
-            ],
-          }),
+      if (error) {
+        console.error("Photo analysis function error:", error);
+        setPreviewUrl("");
+        // Surface the server's real message when the function responded
+        // (e.g. 503 missing key, 429 rate limit, 502 Gemini failure) instead
+        // of always blaming deployment. Only network-level failures mean
+        // the function isn't deployed/reachable.
+        if (error instanceof FunctionsHttpError) {
+          let serverMessage: string | null = null;
+          try {
+            const payload = await error.context.json();
+            serverMessage = typeof payload?.error === "string" ? payload.error : null;
+          } catch {
+            /* ignore body parse errors */
+          }
+          toast({
+            title: "Photo analysis failed",
+            description: serverMessage ?? `Server responded with HTTP ${error.status}. Check function logs in Supabase.`,
+            variant: "destructive",
+          });
+        } else {
+          toast({
+            title: "Photo analysis not connected yet",
+            description:
+              "The image analysis service isn't deployed or unreachable. Deploy the analyze-food-image edge function.",
+            variant: "destructive",
+          });
         }
-      );
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("AI gateway error:", response.status, errorText);
-
-        throw new Error("Failed to analyze image");
+        return;
       }
+      if (!data?.success || !data.data) throw new Error(data?.error ?? "No analysis received.");
 
-      const data = await response.json();
-      const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
-
-      if (!content) {
-        throw new Error("No analysis received");
-      }
-
-      let analysisData;
-      try {
-        const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/) || [null, content];
-        analysisData = JSON.parse(jsonMatch[1].trim());
-      } catch (parseError) {
-        console.error("Failed to parse analysis:", parseError);
-        throw new Error("Failed to parse analysis");
-      }
+      const analysisData = data.data as PhotoAnalysisData;
 
       setAnalysisData(analysisData);
+      if (lastFileRef.current) lastFileRef.current.ok = true;
       toast({ title: "Photo analyzed!", description: "Food items identified successfully." });
     } catch (error) {
       console.error("Error analyzing photo:", error);
@@ -142,18 +126,21 @@ Be as accurate as possible with portion estimates. If you cannot identify a food
       });
       setPreviewUrl("");
     } finally {
+      processingRef.current = false;
       setIsAnalyzing(false);
     }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    console.log("[NutriVeda] photo selected:", file ? `${file.name} (${file.type}, ${file.size} bytes)` : "none");
     if (file) processFile(file);
     e.target.value = "";
   };
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     setIsDragging(false);
     const file = e.dataTransfer.files?.[0];
     if (file) processFile(file);
@@ -161,39 +148,57 @@ Be as accurate as possible with portion estimates. If you cannot identify a food
 
   const clearAnalysis = () => {
     setAnalysisData(null);
-    setPreviewUrl("");
+    setPreviewUrl((prev) => {
+      if (prev.startsWith("blob:")) URL.revokeObjectURL(prev);
+      return "";
+    });
   };
 
-  // Always-fresh reference to the latest processFile, so the window-level
-  // drop listener below can stay mounted for the component's whole life.
-  const processFileRef = useRef(processFile);
+  const handleBarcodeScan = async () => {
+    // Use native BarcodeDetector when available (Chrome/Edge), else fall back to manual entry.
+    try {
+      const W = window as unknown as { BarcodeDetector?: new (opts?: object) => { detect: (src: ImageBitmapSource) => Promise<Array<{ rawValue: string }>> } };
+      if (W.BarcodeDetector && fileInputRef.current) {
+        toast({ title: "Barcode mode", description: "Upload a photo of the barcode — we'll detect it." });
+        setShowBarcode(true);
+        return;
+      }
+    } catch {
+      /* ignore */
+    }
+    setShowBarcode((v) => !v);
+  };
+
+  const clearAnalysisRef = useRef(processFile);
   useEffect(() => {
-    processFileRef.current = processFile;
+    clearAnalysisRef.current = processFile;
   });
 
-  // Global drop guard: without this, dropping outside the small dashed box
-  // makes the browser navigate away to open the image (or do nothing).
-  // With it, ANY drop position on the page is accepted.
   useEffect(() => {
     const hasFiles = (e: DragEvent) => e.dataTransfer?.types.includes("Files");
     const prevent = (e: DragEvent) => {
       if (hasFiles(e)) e.preventDefault();
     };
-    const handleDrop = (e: DragEvent) => {
+    const onDrop = (e: DragEvent) => {
       if (!hasFiles(e)) return;
       e.preventDefault();
-      // Ignore drops that already landed on the dedicated drop zone
-      if ((e.target as HTMLElement)?.closest?.('[data-dropzone]')) return;
+      if ((e.target as HTMLElement)?.closest?.("[data-dropzone]")) return;
       const file = e.dataTransfer?.files?.[0];
-      if (file) processFileRef.current(file);
+      if (file) clearAnalysisRef.current(file);
     };
     window.addEventListener("dragover", prevent);
-    window.addEventListener("drop", handleDrop);
+    window.addEventListener("drop", onDrop);
     return () => {
       window.removeEventListener("dragover", prevent);
-      window.removeEventListener("drop", handleDrop);
+      window.removeEventListener("drop", onDrop);
     };
   }, []);
+
+  // Real stats derived from actual usage
+  const mealsLogged = logs.length;
+  const dayKeys = Array.from(new Set(logs.map((l) => dayKey(l.logged_at))));
+  const streak = calcStreak(dayKeys);
+  const searches = history.length;
 
   return (
     <section id="home" className="relative min-h-screen pt-24 pb-16 overflow-hidden">
@@ -216,8 +221,7 @@ Be as accurate as possible with portion estimates. If you cannot identify a food
             Upload a photo of your meal or search for any food. Get instant nutrition insights powered by AI and ancient Ayurvedic wisdom.
           </p>
 
-          {/* Search Bar */}
-          <form onSubmit={handleSearch} className="max-w-2xl mx-auto mb-8 animate-fade-in-up" style={{ animationDelay: "0.3s" }}>
+          <form onSubmit={handleSearch} className="max-w-2xl mx-auto mb-4 animate-fade-in-up" style={{ animationDelay: "0.3s" }}>
             <div className="relative flex items-center gap-2">
               <div className="relative flex-1">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
@@ -227,6 +231,7 @@ Be as accurate as possible with portion estimates. If you cannot identify a food
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-12 pr-4 h-14 text-base shadow-card"
+                  aria-label="Search for food nutrition"
                 />
               </div>
               <Button type="submit" variant="hero" size="xl" disabled={isLoading}>
@@ -239,12 +244,46 @@ Be as accurate as possible with portion estimates. If you cannot identify a food
                   "Search"
                 )}
               </Button>
+              <Button type="button" variant="outline" size="xl" onClick={handleBarcodeScan} aria-label="Scan barcode" title="Scan packaged food barcode">
+                <Barcode className="w-5 h-5" />
+              </Button>
             </div>
           </form>
 
-          {/* Photo Upload Area */}
+          {showBarcode && (
+            <div className="max-w-2xl mx-auto mb-4 flex gap-2 animate-fade-in">
+              <Input
+                placeholder="Enter barcode (e.g. 3017620422003)"
+                value={barcode}
+                onChange={(e) => setBarcode(e.target.value)}
+                inputMode="numeric"
+                aria-label="Product barcode"
+              />
+              <Button type="button" variant="secondary" onClick={() => lookupByBarcode(barcode)} disabled={isLoading || !barcode.trim()}>
+                Look up
+              </Button>
+            </div>
+          )}
+
+          {history.length > 0 && (
+            <div className="max-w-2xl mx-auto mb-8 flex flex-wrap items-center justify-center gap-2 animate-fade-in">
+              <span className="text-xs text-muted-foreground flex items-center gap-1"><History className="w-3.5 h-3.5" /> Recent:</span>
+              {history.slice(0, 5).map((h) => (
+                <button
+                  key={h}
+                  type="button"
+                  onClick={() => { setSearchQuery(h); lookupNutrition(h); }}
+                  className="text-xs px-3 py-1.5 rounded-full bg-card border border-border/60 hover:border-primary/60 hover:text-primary transition-colors"
+                >
+                  {h}
+                </button>
+              ))}
+            </div>
+          )}
+
           <input
             ref={fileInputRef}
+            id="meal-photo-input"
             type="file"
             accept="image/*"
             capture="environment"
@@ -254,15 +293,27 @@ Be as accurate as possible with portion estimates. If you cannot identify a food
           <div
             className={`max-w-2xl mx-auto animate-fade-in-up ${isDragging ? "scale-105" : ""}`}
             style={{ animationDelay: "0.4s" }}
-            onClick={() => !isAnalyzing && fileInputRef.current?.click()}
           >
             <div
               data-dropzone
+              role="button"
+              tabIndex={0}
+              aria-label="Upload food photo for analysis. Press Enter to browse files."
               className={`relative p-8 md:p-12 rounded-2xl border-2 border-dashed transition-all duration-300 cursor-pointer group ${
                 isDragging
                   ? "border-primary bg-primary/5"
                   : "border-border hover:border-primary/50 bg-card/50 backdrop-blur-sm"
               }`}
+              onClick={() => {
+                if (isAnalyzing) return;
+                if (!fileInputRef.current) {
+                  console.error("[NutriVeda] file input ref is null");
+                  toast({ title: "Upload unavailable", description: "Please refresh the page and try again.", variant: "destructive" });
+                  return;
+                }
+                fileInputRef.current.click();
+              }}
+              onKeyDown={(e) => { if ((e.key === "Enter" || e.key === " ") && !isAnalyzing) { e.preventDefault(); fileInputRef.current?.click(); } }}
               onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
               onDragLeave={() => setIsDragging(false)}
               onDrop={handleDrop}
@@ -286,21 +337,26 @@ Be as accurate as possible with portion estimates. If you cannot identify a food
                     <p className="text-foreground font-medium mb-1">Drop your food photo here</p>
                     <p className="text-sm text-muted-foreground">or click to upload • PNG, JPG up to 10MB</p>
                   </div>
-                  <Button variant="outline" size="lg" className="mt-2" onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}>
+                  {/* Native label trigger: opens the picker without JS, so an
+                      upload works even if programmatic .click() is blocked. */}
+                  <label
+                    htmlFor="meal-photo-input"
+                    onClick={(e) => e.stopPropagation()}
+                    className="mt-2 inline-flex items-center justify-center gap-2 h-12 rounded-lg px-8 text-base border-2 border-primary bg-transparent text-primary hover:bg-primary hover:text-primary-foreground transition-all cursor-pointer"
+                  >
                     <Upload className="w-4 h-4 mr-2" />
                     Upload Photo
-                  </Button>
+                  </label>
                 </div>
               )}
             </div>
           </div>
 
-          {/* Quick Stats */}
           <div className="grid grid-cols-3 gap-4 max-w-lg mx-auto mt-16 animate-fade-in-up" style={{ animationDelay: "0.5s" }}>
             {[
-              { value: "10K+", label: "Foods" },
-              { value: "99%", label: "Accuracy" },
-              { value: "50+", label: "Nutrients" },
+              { value: String(mealsLogged), label: "Meals logged" },
+              { value: streak > 0 ? `${streak}d` : "—", label: "Day streak" },
+              { value: String(searches), label: "Foods searched" },
             ].map((stat) => (
               <div key={stat.label} className="text-center">
                 <div className="text-2xl md:text-3xl font-serif font-bold text-primary">{stat.value}</div>

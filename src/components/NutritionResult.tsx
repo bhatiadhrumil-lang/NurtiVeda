@@ -1,8 +1,11 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { X, Flame, Dumbbell, Wheat, Droplets, Leaf, Heart } from "lucide-react";
+import { X, Flame, Dumbbell, Wheat, Droplets, Leaf, Heart, Plus, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { useMealLogs } from "@/hooks/useMealLogs";
 
 interface NutrientValue {
   value: number;
@@ -50,27 +53,63 @@ interface NutritionResultProps {
 
 const NutritionResult = ({ data, onClose }: NutritionResultProps) => {
   const macros = data.macronutrients;
+  const { addLog } = useMealLogs();
+  const [mealType, setMealType] = useState("lunch");
+  const [logged, setLogged] = useState(false);
+  const [logging, setLogging] = useState(false);
+
+  const handleLog = async () => {
+    setLogging(true);
+    await addLog({
+      meal_name: data.foodName,
+      meal_type: mealType,
+      food_items: [data.foodName],
+      calories: macros.calories.value,
+      protein: macros.protein.value,
+      carbs: macros.carbohydrates.value,
+      fat: macros.fat.value,
+      fiber: macros.fiber.value,
+      notes: `Logged from search (${data.servingSize})`,
+      logged_at: new Date().toISOString(),
+    });
+    setLogging(false);
+    setLogged(true);
+  };
 
   return (
-    <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <Card className="w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-2xl border-border/50">
-        <CardHeader className="sticky top-0 bg-card z-10 border-b border-border/50">
-          <div className="flex items-center justify-between">
+    <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent className="w-full max-w-4xl max-h-[90vh] overflow-y-auto p-0 gap-0 [&>button]:hidden" aria-describedby={undefined}>
+        <DialogHeader className="sticky top-0 bg-card z-10 border-b border-border/50 p-6 pb-4 text-left">
+          <div className="flex items-start justify-between gap-4 pr-8">
             <div>
-              <CardTitle className="text-2xl font-serif text-foreground capitalize">
+              <DialogTitle className="text-2xl font-serif capitalize">
                 {data.foodName}
-              </CardTitle>
-              <p className="text-muted-foreground text-sm mt-1">{data.description}</p>
+              </DialogTitle>
+              <DialogDescription className="mt-1">{data.description}</DialogDescription>
               <Badge variant="secondary" className="mt-2">Per {data.servingSize}</Badge>
             </div>
-            <Button variant="ghost" size="icon" onClick={onClose}>
+            <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close nutrition result">
               <X className="w-5 h-5" />
             </Button>
           </div>
-        </CardHeader>
+          <div className="flex flex-wrap items-center gap-2 mt-4 p-3 rounded-lg bg-accent/40 border border-border/50">
+            <Select value={mealType} onValueChange={setMealType}>
+              <SelectTrigger className="w-36 h-9"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="breakfast">Breakfast</SelectItem>
+                <SelectItem value="lunch">Lunch</SelectItem>
+                <SelectItem value="dinner">Dinner</SelectItem>
+                <SelectItem value="snack">Snack</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button onClick={handleLog} disabled={logging || logged} size="sm" variant="hero">
+              {logged ? <><Check className="w-4 h-4 mr-1" /> Logged!</> : <><Plus className="w-4 h-4 mr-1" /> {logging ? "Logging..." : "Log this meal"}</>}
+            </Button>
+            {logged && <span className="text-xs text-muted-foreground">Find it in Meal Log → History.</span>}
+          </div>
+        </DialogHeader>
 
-        <CardContent className="p-6 space-y-6">
-          {/* Macronutrients */}
+        <div className="p-6 space-y-6">
           <div>
             <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
               <Flame className="w-5 h-5 text-primary" />
@@ -104,7 +143,6 @@ const NutritionResult = ({ data, onClose }: NutritionResultProps) => {
               </div>
             </div>
 
-            {/* Additional Macros */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
               <div className="bg-muted/30 rounded-lg p-3 text-center">
                 <div className="text-lg font-semibold text-foreground">{macros.fiber.value}g</div>
@@ -127,9 +165,9 @@ const NutritionResult = ({ data, onClose }: NutritionResultProps) => {
 
           <Separator />
 
-          {/* Micronutrients */}
+          {data.micronutrients.vitamins.length + data.micronutrients.minerals.length > 0 ? (
           <div className="grid md:grid-cols-2 gap-6">
-            {/* Vitamins */}
+            {data.micronutrients.vitamins.length > 0 && (
             <div>
               <h3 className="text-lg font-semibold text-foreground mb-3 flex items-center gap-2">
                 <Leaf className="w-5 h-5 text-sage" />
@@ -143,16 +181,17 @@ const NutritionResult = ({ data, onClose }: NutritionResultProps) => {
                       <span className="text-sm font-medium text-foreground">
                         {vitamin.value}{vitamin.unit}
                       </span>
-                      <Badge variant="outline" className="text-xs">
-                        {vitamin.dailyValue}
-                      </Badge>
+                      {vitamin.dailyValue && (
+                        <Badge variant="outline" className="text-xs">{vitamin.dailyValue}</Badge>
+                      )}
                     </div>
                   </div>
                 ))}
               </div>
             </div>
+            )}
 
-            {/* Minerals */}
+            {data.micronutrients.minerals.length > 0 && (
             <div>
               <h3 className="text-lg font-semibold text-foreground mb-3 flex items-center gap-2">
                 <Heart className="w-5 h-5 text-terracotta" />
@@ -166,19 +205,24 @@ const NutritionResult = ({ data, onClose }: NutritionResultProps) => {
                       <span className="text-sm font-medium text-foreground">
                         {mineral.value}{mineral.unit}
                       </span>
-                      <Badge variant="outline" className="text-xs">
-                        {mineral.dailyValue}
-                      </Badge>
+                      {mineral.dailyValue && (
+                        <Badge variant="outline" className="text-xs">{mineral.dailyValue}</Badge>
+                      )}
                     </div>
                   </div>
                 ))}
               </div>
             </div>
+            )}
           </div>
+          ) : (
+          <p className="text-sm text-muted-foreground text-center py-2">
+            Detailed vitamin/mineral breakdown isn&apos;t available from this source — macros, benefits and Ayurvedic properties above are complete.
+          </p>
+          )}
 
           <Separator />
 
-          {/* Health Benefits */}
           <div>
             <h3 className="text-lg font-semibold text-foreground mb-3">Health Benefits</h3>
             <div className="flex flex-wrap gap-2">
@@ -192,10 +236,9 @@ const NutritionResult = ({ data, onClose }: NutritionResultProps) => {
 
           <Separator />
 
-          {/* Ayurvedic Properties */}
           <div className="bg-gradient-to-r from-terracotta/10 to-sage/10 rounded-xl p-5">
             <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
-              🕉️ Ayurvedic Properties
+              Ayurvedic Properties
             </h3>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div>
@@ -216,9 +259,9 @@ const NutritionResult = ({ data, onClose }: NutritionResultProps) => {
               </div>
             </div>
           </div>
-        </CardContent>
-      </Card>
-    </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 };
 

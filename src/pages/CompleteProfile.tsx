@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Leaf } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useEffect } from "react";
+import { setActivityLevel, ACTIVITY_OPTIONS } from "@/lib/health";
 
 const CompleteProfile = () => {
   const navigate = useNavigate();
@@ -21,6 +22,7 @@ const CompleteProfile = () => {
   const [gender, setGender] = useState("");
   const [weight, setWeight] = useState("");
   const [height, setHeight] = useState("");
+  const [activity, setActivity] = useState("light");
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
@@ -55,6 +57,7 @@ const CompleteProfile = () => {
     if (error) {
       toast({ title: "Failed to save profile", description: error.message, variant: "destructive" });
     } else {
+      setActivityLevel(activity);
       toast({ title: "Profile saved!", description: "Welcome to NutriVeda." });
       navigate("/");
     }
@@ -151,6 +154,20 @@ const CompleteProfile = () => {
                     onChange={(e) => setHeight(e.target.value)}
                   />
                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="activity">Activity level</Label>
+                <Select value={activity} onValueChange={setActivity}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select activity" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ACTIVITY_OPTIONS.map((o) => (
+                      <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="flex gap-3 pt-2">

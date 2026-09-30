@@ -24,6 +24,8 @@ const Auth = () => {
   const [showLoginPass, setShowLoginPass] = useState(false);
   const [showSignupPass, setShowSignupPass] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
+  const [resendSent, setResendSent] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -46,10 +48,48 @@ const Auth = () => {
     }
   };
 
+  const handleReset = async () => {
+    if (!loginEmail.trim()) {
+      toast({ title: "Enter your email first", description: "Type your login email above, then click Forgot password.", variant: "destructive" });
+      return;
+    }
+    setIsLoading(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(loginEmail.trim(), {
+      redirectTo: window.location.origin,
+    });
+    setIsLoading(false);
+    if (error) {
+      toast({ title: "Reset failed", description: error.message, variant: "destructive" });
+    } else {
+      setResetSent(true);
+      toast({ title: "Check your email", description: "Password reset link sent." });
+    }
+  };
+
+  const handleResend = async () => {
+    if (!loginEmail.trim()) {
+      toast({ title: "Enter your email first", description: "Type your login email above, then click Resend confirmation email.", variant: "destructive" });
+      return;
+    }
+    setIsLoading(true);
+    const { error } = await supabase.auth.resend({ type: "signup", email: loginEmail.trim() });
+    setIsLoading(false);
+    if (error) {
+      toast({ title: "Resend failed", description: error.message, variant: "destructive" });
+    } else {
+      setResendSent(true);
+      toast({ title: "Check your email", description: "Confirmation link sent. Click it, then log in." });
+    }
+  };
+
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     if (signupUsername.trim().length < 2) {
       toast({ title: "Invalid username", description: "Username must be at least 2 characters.", variant: "destructive" });
+      return;
+    }
+    if (signupPassword.length < 6) {
+      toast({ title: "Weak password", description: "Use at least 6 characters.", variant: "destructive" });
       return;
     }
     setIsLoading(true);
@@ -129,6 +169,18 @@ const Auth = () => {
                   <Button type="submit" variant="hero" className="w-full" disabled={isLoading}>
                     {isLoading ? "Logging in..." : "Login"}
                   </Button>
+                  <div className="flex items-center justify-between text-sm">
+                    <button type="button" onClick={handleReset} className="text-primary hover:underline" disabled={isLoading}>
+                      Forgot password?
+                    </button>
+                    {resetSent && <span className="text-muted-foreground text-xs">Reset email sent ✓</span>}
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <button type="button" onClick={handleResend} className="text-primary hover:underline" disabled={isLoading}>
+                      Resend confirmation email
+                    </button>
+                    {resendSent && <span className="text-muted-foreground text-xs">Confirmation sent ✓</span>}
+                  </div>
                 </form>
               </TabsContent>
 

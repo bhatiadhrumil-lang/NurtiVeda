@@ -1,5 +1,10 @@
 import { useState } from "react";
+import { FunctionsHttpError } from "@supabase/supabase-js";
+import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { getMockNutrition } from "@/lib/mockNutrition";
+import { getSearchHistory, pushSearchHistory } from "@/lib/health";
+import { hasMeaningfulMacros, localFoodNutrition, lookupOffFood, offProductNutrition } from "@/lib/offNutrition";
 
 export interface NutritionData {
   foodName: string;
@@ -31,6 +36,7 @@ export interface NutritionData {
 export const useNutritionLookup = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [nutritionData, setNutritionData] = useState<NutritionData | null>(null);
+  const [history, setHistory] = useState<string[]>(() => getSearchHistory());
   const { toast } = useToast();
 
   const lookupNutrition = async (foodQuery: string) => {
@@ -45,110 +51,77 @@ export const useNutritionLookup = () => {
 
     setIsLoading(true);
     setNutritionData(null);
+    pushSearchHistory(foodQuery.trim());
+    setHistory(getSearchHistory());
 
+    const TIMEOUT_MS = 30_000;
+
+    // Resilient chain — text search must work with proper details even when
+    // the Edge Function is down, undeployed, or returns empty (all-zero) data:
+    // 1. Edge AI lookup (richest: full micros + benefits + ayurveda)
+    // 2. Built-in reference database (curated macros + micros + ayurveda)
+    // 3. Open Food Facts direct (real packaged-food data, no key needed)
+    // 4. Clearly-labeled demo fallback (last resort only)
     try {
-      const apiKey = import.meta.env.VITE_GEMINI_API_KEY as string | undefined;
-      if (!apiKey) {
-        throw new Error("Missing VITE_GEMINI_API_KEY. Add it to your environment variables.");
-      }
-
-      const systemPrompt = `You are a nutrition expert. When given a food item, provide detailed nutritional information per 100 grams in JSON format.
-
-Always respond with valid JSON in this exact structure:
-{
-  "foodName": "the food name",
-  "description": "brief description of the food",
-  "servingSize": "100g",
-  "macronutrients": {
-    "calories": { "value": number, "unit": "kcal" },
-    "protein": { "value": number, "unit": "g" },
-    "carbohydrates": { "value": number, "unit": "g" },
-    "fiber": { "value": number, "unit": "g" },
-    "sugar": { "value": number, "unit": "g" },
-    "fat": { "value": number, "unit": "g" },
-    "saturatedFat": { "value": number, "unit": "g" },
-    "unsaturatedFat": { "value": number, "unit": "g" }
-  },
-  "micronutrients": {
-    "vitamins": [
-      { "name": "Vitamin A", "value": number, "unit": "mcg", "dailyValue": "percentage" },
-      { "name": "Vitamin C", "value": number, "unit": "mg", "dailyValue": "percentage" },
-      { "name": "Vitamin D", "value": number, "unit": "mcg", "dailyValue": "percentage" },
-      { "name": "Vitamin E", "value": number, "unit": "mg", "dailyValue": "percentage" },
-      { "name": "Vitamin K", "value": number, "unit": "mcg", "dailyValue": "percentage" },
-      { "name": "Vitamin B6", "value": number, "unit": "mg", "dailyValue": "percentage" },
-      { "name": "Vitamin B12", "value": number, "unit": "mcg", "dailyValue": "percentage" }
-    ],
-    "minerals": [
-      { "name": "Calcium", "value": number, "unit": "mg", "dailyValue": "percentage" },
-      { "name": "Iron", "value": number, "unit": "mg", "dailyValue": "percentage" },
-      { "name": "Magnesium", "value": number, "unit": "mg", "dailyValue": "percentage" },
-      { "name": "Phosphorus", "value": number, "unit": "mg", "dailyValue": "percentage" },
-      { "name": "Potassium", "value": number, "unit": "mg", "dailyValue": "percentage" },
-      { "name": "Sodium", "value": number, "unit": "mg", "dailyValue": "percentage" },
-      { "name": "Zinc", "value": number, "unit": "mg", "dailyValue": "percentage" }
-    ]
-  },
-  "healthBenefits": ["benefit 1", "benefit 2", "benefit 3"],
-  "ayurvedicProperties": {
-    "dosha": "which doshas it balances (Vata/Pitta/Kapha)",
-    "taste": "rasa (sweet/sour/salty/bitter/pungent/astringent)",
-    "energy": "virya (heating/cooling)",
-    "postDigestive": "vipaka effect"
-  }
-}
-
-Use accurate nutritional data. If exact values are unknown, provide reasonable estimates based on similar foods. Include all vitamins and minerals listed above.`;
-
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            contents: [
-              {
-                role: "user",
-                parts: [
-                  { text: systemPrompt },
-                  { text: `Provide detailed nutritional information for: ${foodQuery.trim()}` },
-                ],
-              },
-            ],
-          }),
-        }
-      );
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("AI gateway error:", response.status, errorText);
-        throw new Error(`Failed to get nutrition data (HTTP ${response.status})`);
-      }
-
-      const data = await response.json();
-      const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
-
-      if (!content) {
-        throw new Error("No nutrition data received");
-      }
-
-      let nutritionData;
       try {
-        const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/) || [null, content];
-        const jsonStr = jsonMatch[1].trim();
-        nutritionData = JSON.parse(jsonStr);
-      } catch (parseError) {
-        console.error("Failed to parse nutrition data:", parseError);
-        console.log("Raw content:", content);
-        throw new Error("Failed to parse nutrition data");
+        const result = await Promise.race([
+          supabase.functions.invoke("nutrition-lookup", {
+            body: { foodQuery: foodQuery.trim() },
+          }),
+          new Promise<{ data: null; error: Error }>((_, reject) =>
+            setTimeout(() => reject(new Error("Response timed out.")), TIMEOUT_MS)
+          ),
+        ]);
+        const { data, error } = result as { data: unknown; error: unknown };
+
+        if (!error && (data as { success?: boolean; data?: NutritionData } | null)?.success) {
+          const candidate = (data as { data: NutritionData }).data;
+          if (hasMeaningfulMacros(candidate)) {
+            setNutritionData(candidate);
+            toast({
+              title: "Nutrition data found!",
+              description: `Showing nutrition information for ${candidate.foodName}`,
+            });
+            return;
+          }
+          console.warn("Edge lookup returned empty macros; trying other sources.");
+        } else if (error instanceof FunctionsHttpError) {
+          console.warn("Edge lookup failed; trying other sources:", error.status);
+        } else if (error) {
+          console.warn("Edge lookup unreachable; trying other sources.");
+        }
+      } catch (edgeError) {
+        console.warn("Edge lookup threw; trying other sources.", edgeError);
       }
 
-      setNutritionData(nutritionData);
+      const localData = localFoodNutrition(foodQuery);
+      if (localData) {
+        setNutritionData(localData);
+        toast({
+          title: "Nutrition data found!",
+          description: `Reference values for ${localData.foodName}.`,
+        });
+        return;
+      }
+
+      const offData = await lookupOffFood(foodQuery);
+      if (offData) {
+        setNutritionData(offData);
+        toast({
+          title: "Nutrition data found!",
+          description: `Live product data for ${offData.foodName} (Open Food Facts).`,
+        });
+        return;
+      }
+
+      const fallback = getMockNutrition(foodQuery);
+      setNutritionData(fallback);
       toast({
-        title: "Nutrition data found!",
-        description: `Showing nutrition information for ${nutritionData.foodName}`,
+        title: "Showing sample nutrition data",
+        description:
+          "Live sources are unreachable right now — these are clearly-labeled demo values for " +
+          fallback.foodName +
+          ".",
       });
     } catch (error) {
       console.error("Error looking up nutrition:", error);
@@ -166,10 +139,38 @@ Use accurate nutritional data. If exact values are unknown, provide reasonable e
     setNutritionData(null);
   };
 
+  const lookupByBarcode = async (barcode: string) => {
+    const code = barcode.trim();
+    if (!code) return;
+    setIsLoading(true);
+    setNutritionData(null);
+    try {
+      const res = await fetch(`https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(code)}.json?fields=product_name,product_name_en,nutriments`);
+      const json = (await res.json()) as { status?: number; product?: { product_name?: string; product_name_en?: string; nutriments?: Record<string, unknown> } };
+      if (json?.status !== 1 || !json.product) throw new Error("Product not found for this barcode.");
+      const mapped = offProductNutrition(json.product, `Barcode ${code}`);
+      if (!mapped) throw new Error("This product has no nutrition data on Open Food Facts.");
+      setNutritionData(mapped);
+      pushSearchHistory(mapped.foodName);
+      setHistory(getSearchHistory());
+      toast({ title: "Product found!", description: `Showing nutrition for ${mapped.foodName}` });
+    } catch (error) {
+      toast({
+        title: "Barcode lookup failed",
+        description: error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return {
     isLoading,
     nutritionData,
+    history,
     lookupNutrition,
+    lookupByBarcode,
     clearNutritionData,
   };
 };

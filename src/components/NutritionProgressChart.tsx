@@ -1,10 +1,15 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, ReferenceLine } from "recharts";
 import { format, subDays, startOfDay } from "date-fns";
+import { Link } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+import { UtensilsCrossed } from "lucide-react";
 import type { MealLog } from "@/hooks/useMealLogs";
+import { dayKey, calcStreak } from "@/lib/health";
 
 interface NutritionProgressChartProps {
   logs: MealLog[];
+  calorieTarget?: number | null;
 }
 
 const COLORS = [
@@ -14,8 +19,22 @@ const COLORS = [
   "hsl(150, 25%, 45%)",
 ];
 
-const NutritionProgressChart = ({ logs }: NutritionProgressChartProps) => {
-  // Last 7 days bar chart data
+const NutritionProgressChart = ({ logs, calorieTarget }: NutritionProgressChartProps) => {
+  if (logs.length === 0) {
+    return (
+      <Card className="border-border/50">
+        <CardContent className="py-12 text-center">
+          <UtensilsCrossed className="w-10 h-10 mx-auto text-muted-foreground mb-3" />
+          <p className="text-lg font-serif">No nutrition data yet</p>
+          <p className="text-sm text-muted-foreground mt-1 mb-4">Log your first meal to unlock weekly trends and macro split.</p>
+          <Link to="/meal-log">
+            <Button size="sm" variant="hero">Log a meal</Button>
+          </Link>
+        </CardContent>
+      </Card>
+    );
+  }
+
   const last7Days = Array.from({ length: 7 }, (_, i) => {
     const date = startOfDay(subDays(new Date(), 6 - i));
     const dayLogs = logs.filter(
@@ -30,7 +49,6 @@ const NutritionProgressChart = ({ logs }: NutritionProgressChartProps) => {
     };
   });
 
-  // Totals for pie chart
   const totalProtein = logs.reduce((s, l) => s + l.protein, 0);
   const totalCarbs = logs.reduce((s, l) => s + l.carbs, 0);
   const totalFat = logs.reduce((s, l) => s + l.fat, 0);
@@ -40,21 +58,19 @@ const NutritionProgressChart = ({ logs }: NutritionProgressChartProps) => {
     { name: "Fat", value: totalFat },
   ].filter((d) => d.value > 0);
 
-  // Summary stats
   const totalCalories = logs.reduce((s, l) => s + l.calories, 0);
-  const avgCalories = logs.length > 0 ? Math.round(totalCalories / Math.max(1, new Set(logs.map(l => format(new Date(l.logged_at), "yyyy-MM-dd"))).size)) : 0;
-
-  if (logs.length === 0) return null;
+  const activeDays = new Set(logs.map((l) => dayKey(l.logged_at))).size;
+  const avgCalories = logs.length > 0 ? Math.round(totalCalories / Math.max(1, activeDays)) : 0;
+  const streak = calcStreak(Array.from(new Set(logs.map((l) => dayKey(l.logged_at)))));
 
   return (
     <div className="space-y-4">
-      {/* Summary Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
           { label: "Total Meals", value: logs.length, color: "text-primary" },
           { label: "Total Calories", value: totalCalories.toLocaleString(), color: "text-destructive" },
           { label: "Avg Cal/Day", value: avgCalories.toLocaleString(), color: "text-secondary" },
-          { label: "Total Protein", value: `${totalProtein}g`, color: "text-primary" },
+          { label: streak > 0 ? `${streak}d streak` : "Total Protein", value: streak > 0 ? "🔥" : `${totalProtein}g`, color: "text-primary" },
         ].map((stat) => (
           <Card key={stat.label} className="border-border/50">
             <CardContent className="p-3 text-center">
@@ -65,11 +81,10 @@ const NutritionProgressChart = ({ logs }: NutritionProgressChartProps) => {
         ))}
       </div>
 
-      {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <Card className="border-border/50 lg:col-span-2">
           <CardHeader className="pb-2">
-            <CardTitle className="font-serif text-lg">Calories – Last 7 Days</CardTitle>
+            <CardTitle className="font-serif text-lg">Calories – Last 7 Days{calorieTarget ? ` (target ${calorieTarget})` : ""}</CardTitle>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={220}>
@@ -78,6 +93,7 @@ const NutritionProgressChart = ({ logs }: NutritionProgressChartProps) => {
                 <XAxis dataKey="date" tick={{ fontSize: 12 }} />
                 <YAxis tick={{ fontSize: 12 }} />
                 <Tooltip />
+                {calorieTarget ? <ReferenceLine y={calorieTarget} stroke="hsl(0, 70%, 50%)" strokeDasharray="4 4" label={{ value: "goal", fontSize: 10 }} /> : null}
                 <Bar dataKey="calories" fill="hsl(150, 35%, 35%)" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>

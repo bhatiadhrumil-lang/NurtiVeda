@@ -63,8 +63,8 @@ const DoshaQuiz = () => {
         kapha_score: scores.kapha,
         primary_dosha: primaryDosha,
         secondary_dosha: secondaryDosha,
-        answers,
-      } as any);
+        answers: answers as unknown as never,
+      });
 
       if (error) {
         toast({ title: "Could not save results", description: error.message, variant: "destructive" });

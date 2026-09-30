@@ -1,0 +1,17 @@
+{
+  "name": "NutriVeda",
+  "short_name": "NutriVeda",
+  "description": "AI nutrition search, meal photo analysis, meal logging and Ayurvedic meal plans.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f7f3ea",
+  "theme_color": "#3f7a5e",
+  "icons": [
+    {
+      "src": "/placeholder.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
