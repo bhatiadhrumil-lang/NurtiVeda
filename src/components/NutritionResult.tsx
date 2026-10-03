@@ -223,6 +223,7 @@ const NutritionResult = ({ data, onClose }: NutritionResultProps) => {
 
           <Separator />
 
+          {data.healthBenefits.length > 0 && (
           <div>
             <h3 className="text-lg font-semibold text-foreground mb-3">Health Benefits</h3>
             <div className="flex flex-wrap gap-2">
@@ -233,6 +234,7 @@ const NutritionResult = ({ data, onClose }: NutritionResultProps) => {
               ))}
             </div>
           </div>
+          )}
 
           <Separator />
 

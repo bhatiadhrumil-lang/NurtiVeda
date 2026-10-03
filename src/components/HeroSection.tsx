@@ -29,7 +29,7 @@ const HeroSection = () => {
   const processingRef = useRef(false);
   const lastFileRef = useRef<{ name: string; size: number; lastModified: number; at: number; ok: boolean } | null>(null);
   const { toast } = useToast();
-  const { isLoading, nutritionData, history, lookupNutrition, lookupByBarcode, clearNutritionData } = useNutritionLookup();
+  const { isLoading, nutritionData, notFound, lastMatches, history, lookupNutrition, lookupByBarcode, clearNutritionData } = useNutritionLookup();
   const { logs } = useMealLogs();
 
   const handleSearch = (e: React.FormEvent) => {
@@ -262,6 +262,39 @@ const HeroSection = () => {
               <Button type="button" variant="secondary" onClick={() => lookupByBarcode(barcode)} disabled={isLoading || !barcode.trim()}>
                 Look up
               </Button>
+            </div>
+          )}
+
+          {notFound && (
+            <div className="max-w-2xl mx-auto mb-4 flex items-start justify-between gap-3 p-4 rounded-xl bg-card border border-border/60 text-left animate-fade-in" role="status">
+              <div>
+                <p className="font-medium text-foreground">No food found for &lsquo;{notFound}&rsquo;.</p>
+                <p className="text-sm text-muted-foreground mt-0.5">Please check the spelling and try again.</p>
+              </div>
+              <button
+                type="button"
+                onClick={clearNutritionData}
+                aria-label="Dismiss no-result message"
+                className="text-muted-foreground hover:text-foreground text-lg leading-none px-1"
+              >
+                ×
+              </button>
+            </div>
+          )}
+
+          {nutritionData && lastMatches.length > 0 && (
+            <div className="max-w-2xl mx-auto mb-4 flex flex-wrap items-center justify-center gap-2 animate-fade-in">
+              <span className="text-xs text-muted-foreground">Also found:</span>
+              {lastMatches.map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => lookupNutrition(m)}
+                  className="text-xs px-3 py-1.5 rounded-full bg-card border border-border/60 hover:border-primary/60 hover:text-primary transition-colors"
+                >
+                  {m}
+                </button>
+              ))}
             </div>
           )}
 

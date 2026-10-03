@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { normalizeNutrition } from "../_shared/normalize.ts";
 import { extractJsonObject } from "../_shared/json.ts";
 import { generateWithModelFallback } from "../_shared/gemini.ts";
+import { isFoodNameMatch, notFoundMessage, selectVerifiedMatches } from "../_shared/verify.ts";
 
 const ALLOWED_ORIGIN = Deno.env.get("ALLOWED_ORIGIN") ?? "*";
 const corsHeaders = {
@@ -123,27 +124,61 @@ serve(async (req) => {
       return json({ error: "Enter a food name of up to 100 characters." }, 400);
     }
 
+    // Cache hits must carry the verification envelope (data + match).
+    // Entries cached by older versions (including any unverified results)
+    // are treated as misses so they can never resurface.
+    const isVerifiedEnvelope = (entry: unknown): entry is { data: unknown; match: { name: string } } => {
+      if (!entry || typeof entry !== "object") return false;
+      const rec = entry as Record<string, unknown>;
+      const match = rec.match as Record<string, unknown> | undefined;
+      return (
+        typeof match?.name === "string" &&
+        isFoodNameMatch(normalizedQuery, match.name as string) &&
+        rec.data != null
+      );
+    };
     const cached = cache.get(normalizedQuery);
-    if (cached && cached.expiresAt > Date.now()) return json({ success: true, data: cached.data, cached: true });
+    if (cached && cached.expiresAt > Date.now() && isVerifiedEnvelope(cached.data)) {
+      const payload = cached.data as { data: unknown; match: unknown; matches?: unknown; query?: unknown };
+      return json({
+        success: true,
+        data: payload.data,
+        match: payload.match,
+        matches: Array.isArray(payload.matches) ? payload.matches : [],
+        query: typeof payload.query === "string" ? payload.query : foodQuery,
+        cached: true,
+      });
+    }
     cache.delete(normalizedQuery);
     const persistent = await getPersistentCache(normalizedQuery);
-    if (persistent) {
+    if (persistent && isVerifiedEnvelope(persistent)) {
+      const payload = persistent as { data: unknown; match: unknown; matches?: unknown; query?: unknown };
       if (cache.size >= MAX_CACHE_ENTRIES) {
         const oldestKey = cache.keys().next().value;
         if (oldestKey) cache.delete(oldestKey);
       }
       cache.set(normalizedQuery, { data: persistent, expiresAt: Date.now() + CACHE_TTL_MS });
-      return json({ success: true, data: persistent, cached: true });
+      return json({
+        success: true,
+        data: payload.data,
+        match: payload.match,
+        matches: Array.isArray(payload.matches) ? payload.matches : [],
+        query: typeof payload.query === "string" ? payload.query : foodQuery,
+        cached: true,
+      });
     }
 
-    // 1. Seed the request with Open Food Facts macros when available. This gives
-    // Gemini a head start and accurate product-backed values, but the full lookup
-    // below is always run so users get complete detail (vitamins, minerals,
-    // benefits, Ayurvedic properties) for every search.
-    let openFoodMacros: Record<string, { value: number; unit: string }> | null = null;
-    let openFoodName: string | null = null;
+    // 1. Trusted verification gate: collect Open Food Facts products whose
+    // names genuinely match the query. Gemini is ONLY called for a verified
+    // product below — an unverified query (e.g. random characters) returns
+    // NOT_FOUND here and never reaches AI, so nothing can be fabricated.
+    interface VerifiedCandidate {
+      name: string;
+      macros: Record<string, { value: number; unit: string }>;
+    }
+    const candidates: VerifiedCandidate[] = [];
     try {
-      const offUrl = `https://world.openfoodfacts.org/api/v2/search?search_simple=1&search_terms=${encodeURIComponent(normalizedQuery)}&page_size=5&fields=product_name,product_name_en,nutriments`;
+      const offUrl = `https://world.openfoodfacts.org/api/v2/search?search_simple=1&search_terms=${encodeURIComponent(normalizedQuery)}&page_size=10&fields=product_name,product_name_en,nutriments`;
       const offResponse = await fetchWithTimeout(offUrl, {}, RESPONSE_TIMEOUT_MS);
       if (offResponse.ok) {
         const offJson = await offResponse.json();
@@ -162,7 +197,7 @@ serve(async (req) => {
               }
               return 0;
             };
-            openFoodMacros = {
+            const macros = {
               calories: { value: getNum(["energy-kcal_100g", "energy-kcal", "calories_100g", "calories"]), unit: "kcal" },
               protein: { value: getNum(["proteins_100g", "proteins", "protein_100g", "protein"]), unit: "g" },
               carbohydrates: { value: getNum(["carbohydrates_100g", "carbohydrates", "carbs_100g", "carbs"]), unit: "g" },
@@ -172,14 +207,31 @@ serve(async (req) => {
               saturatedFat: { value: getNum(["saturated-fat_100g", "saturated-fat", "saturated_fat_100g"]), unit: "g" },
               unsaturatedFat: { value: Math.max(0, getNum(["fat_100g", "fat"]) - getNum(["saturated-fat_100g", "saturated-fat"])), unit: "g" },
             };
-            openFoodName = (prod.product_name_en ?? prod.product_name) as string | null;
-            break;
+            const productName = String(prod.product_name_en ?? prod.product_name ?? "");
+            // Only verified, name-matching products may proceed. An unrelated
+            // first result is never substituted for the user's query.
+            if (productName && isFoodNameMatch(normalizedQuery, productName)) {
+              candidates.push({ name: productName, macros });
+              if (candidates.length >= 5) break;
+            }
           }
         }
       }
     } catch {
-      // Ignore OFF errors; Gemini full lookup below still runs.
+      // Ignore OFF errors; an empty candidate list below yields NOT_FOUND,
+      // never fabricated data.
     }
+
+    if (candidates.length === 0) {
+      return json(
+        { success: false, error: "NOT_FOUND", message: notFoundMessage(foodQuery), query: foodQuery },
+        404,
+      );
+    }
+
+    const best = candidates[0];
+    const openFoodMacros = best.macros;
+    const openFoodName = best.name;
 
     const apiKey = Deno.env.get("GEMINI_API_KEY");
     if (!apiKey) {
@@ -187,25 +239,24 @@ serve(async (req) => {
       return json({ error: "Nutrition analysis is not configured yet. Please contact the site administrator." }, 503);
     }
 
-    const seedHints = openFoodMacros
-      ? ` Macro seed from Open Food Facts (${openFoodName ?? normalizedQuery}): ${JSON.stringify(openFoodMacros)}. Prefer these verified macro values where sensible, but still provide the full object shape including all micronutrients, health benefits, and Ayurvedic properties.`
-      : "";
+    const seedHints = ` Verified product from Open Food Facts: "${openFoodName}". Describe ONLY this verified product using these verified macro values where sensible, and still provide the full object shape including all micronutrients, health benefits, and Ayurvedic properties. Macro seed (per 100g): ${JSON.stringify(openFoodMacros)}. If this is not a real food, return exactly {"unknown":true}.`;
+    const systemText = `You are a precise nutrition database. Return full, accurate nutrition estimates per 100g as JSON only. Use this exact shape: {"foodName":"string","description":"detailed 1-2 sentence description of food origin, taste, texture, and common culinary uses","servingSize":"100g","macronutrients":{"calories":{"value":0,"unit":"kcal"},"protein":{"value":0,"unit":"g"},"carbohydrates":{"value":0,"unit":"g"},"fiber":{"value":0,"unit":"g"},"sugar":{"value":0,"unit":"g"},"fat":{"value":0,"unit":"g"},"saturatedFat":{"value":0,"unit":"g"},"unsaturatedFat":{"value":0,"unit":"g"}},"micronutrients":{"vitamins":[{"name":"string","value":0,"unit":"string","dailyValue":"string"}],"minerals":[{"name":"string","value":0,"unit":"string","dailyValue":"string"}]},"healthBenefits":["string"],"ayurvedicProperties":{"dosha":"string","taste":"string","energy":"string","postDigestive":"string"}}. Provide up to 6 vitamins, up to 6 minerals, 4-5 detailed health benefits, and precise Ayurvedic properties. Keep JSON clean with no markdown.${seedHints}`;
 
     // Shared resilient caller: retries transient Gemini 5xx with backoff and
     // falls through to the next model on sunset/capacity errors.
     const gemini = await generateWithModelFallback(
-      (model) =>
-        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`,
-      {
-        systemInstruction: {
-          parts: [{ text: `You are a precise nutrition database. Return full, accurate nutrition estimates per 100g as JSON only. Use this exact shape: {"foodName":"string","description":"detailed 1-2 sentence description of food origin, taste, texture, and common culinary uses","servingSize":"100g","macronutrients":{"calories":{"value":0,"unit":"kcal"},"protein":{"value":0,"unit":"g"},"carbohydrates":{"value":0,"unit":"g"},"fiber":{"value":0,"unit":"g"},"sugar":{"value":0,"unit":"g"},"fat":{"value":0,"unit":"g"},"saturatedFat":{"value":0,"unit":"g"},"unsaturatedFat":{"value":0,"unit":"g"}},"micronutrients":{"vitamins":[{"name":"string","value":0,"unit":"string","dailyValue":"string"}],"minerals":[{"name":"string","value":0,"unit":"string","dailyValue":"string"}]},"healthBenefits":["string"],"ayurvedicProperties":{"dosha":"string","taste":"string","energy":"string","postDigestive":"string"}}. Provide up to 6 vitamins, up to 6 minerals, 4-5 detailed health benefits, and precise Ayurvedic properties. Keep JSON clean with no markdown.${seedHints}` }],
+        (model) =>
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`,
+        {
+          systemInstruction: {
+            parts: [{ text: systemText }],
+          },
+          contents: [{ role: "user", parts: [{ text: `Food: ${normalizedQuery}` }] }],
+          generationConfig: { responseMimeType: "application/json", temperature: 0.1, maxOutputTokens: 1500, thinkingConfig: { thinkingBudget: 0 } },
         },
-        contents: [{ role: "user", parts: [{ text: `Food: ${normalizedQuery}` }] }],
-        generationConfig: { responseMimeType: "application/json", temperature: 0.1, maxOutputTokens: 1500, thinkingConfig: { thinkingBudget: 0 } },
-      },
-      MODELS,
-      { timeoutMs: 12000, attempts: 2 },
-    );
+        MODELS,
+        { timeoutMs: 12000, attempts: 2 },
+      );
 
     if (!gemini.ok) {
       console.error("Gemini nutrition request failed", gemini.status, gemini.errorText ?? "");
@@ -218,8 +269,9 @@ serve(async (req) => {
     const result = gemini.data as {
       candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
     } | null;
-    const content = result?.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!content) return json({ error: "No nutrition data was returned. Please try again." }, 502);
+    const geminiContent = result?.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!geminiContent) return json({ error: "No nutrition data was returned. Please try again." }, 502);
+    const content = geminiContent;
 
     // Shared extractor (also covered by vitest): tolerates markdown fences
     // and partial output so one formatting quirk doesn't fail the lookup.
@@ -229,19 +281,63 @@ serve(async (req) => {
       return json({ error: "Nutrition data could not be read. Please try again." }, 502);
     }
 
-    // Normalize Gemini's (often varying) output into the exact NutritionData
-    // shape the frontend expects, so the result card always renders.
-    // Shared pure helper (also covered by vitest) — handles both the
-    // prompted nested { value, unit } shape and flat alternates.
-    const normalized = normalizeNutrition(data as Record<string, unknown>, normalizedQuery, openFoodMacros);
+    const matchNames = candidates.map((c) => c.name);
+    const respond = (payload: { data: unknown; match: unknown }) => {
+      const envelope = { ...payload, matches: matchNames, query: foodQuery };
+      if (cache.size >= MAX_CACHE_ENTRIES) {
+        const oldestKey = cache.keys().next().value;
+        if (oldestKey) cache.delete(oldestKey);
+      }
+      cache.set(normalizedQuery, { data: envelope, expiresAt: Date.now() + CACHE_TTL_MS });
+      return setPersistentCache(normalizedQuery, envelope).then(() =>
+        json({ success: true, ...envelope, cached: false }),
+      );
+    };
 
-    if (cache.size >= MAX_CACHE_ENTRIES) {
-      const oldestKey = cache.keys().next().value;
-      if (oldestKey) cache.delete(oldestKey);
+    // Validate the AI output against the verified product before anything
+    // reaches the user. Unknown-token, unparseable drift, or a foodName that
+    // doesn't match the verified product all fall back to verified OFF data.
+    const aiObj = data as Record<string, unknown>;
+    const aiFoodName = typeof aiObj.foodName === "string" ? aiObj.foodName : "";
+    if (aiObj.unknown !== true && aiFoodName && isFoodNameMatch(best.name, aiFoodName)) {
+      // Normalize Gemini's (often varying) output into the exact NutritionData
+      // shape the frontend expects, so the result card always renders.
+      // Shared pure helper (also covered by vitest) — handles both the
+      // prompted nested { value, unit } shape and flat alternates.
+      // Identity always comes from verification, never from the model.
+      const normalized = normalizeNutrition(data as Record<string, unknown>, best.name, openFoodMacros);
+      normalized.foodName = best.name;
+      return respond({ data: normalized, match: { name: best.name, verified: true } }, false);
     }
-    cache.set(normalizedQuery, { data: normalized, expiresAt: Date.now() + CACHE_TTL_MS });
-    await setPersistentCache(normalizedQuery, normalized);
-    return json({ success: true, data: normalized, cached: false });
+
+    // AI declined or drifted: return the verified OFF macros in the full
+    // card shape. Every number here is real product data; micronutrients and
+    // benefits stay empty (rendered as "unavailable", never invented).
+    const m = best.macros;
+    const offCard = {
+      foodName: best.name,
+      description: `Verified product data for "${best.name}" (Open Food Facts, per 100g).`,
+      servingSize: "100g",
+      macronutrients: {
+        calories: { value: m.calories?.value ?? 0, unit: "kcal" },
+        protein: { value: m.protein?.value ?? 0, unit: "g" },
+        carbohydrates: { value: m.carbohydrates?.value ?? 0, unit: "g" },
+        fiber: { value: m.fiber?.value ?? 0, unit: "g" },
+        sugar: { value: m.sugar?.value ?? 0, unit: "g" },
+        fat: { value: m.fat?.value ?? 0, unit: "g" },
+        saturatedFat: { value: m.saturatedFat?.value ?? 0, unit: "g" },
+        unsaturatedFat: { value: m.unsaturatedFat?.value ?? 0, unit: "g" },
+      },
+      micronutrients: { vitamins: [], minerals: [] },
+      healthBenefits: [],
+      ayurvedicProperties: {
+        dosha: "Not specified",
+        taste: "Not specified",
+        energy: "Not specified",
+        postDigestive: "Not specified",
+      },
+    };
+    return respond({ data: offCard, match: { name: best.name, verified: true } }, false);
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") {
       return json({ error: "The nutrition request took too long. Please try again." }, 504);

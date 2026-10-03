@@ -2,9 +2,13 @@ import { useState } from "react";
 import { FunctionsHttpError } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { getMockNutrition } from "@/lib/mockNutrition";
 import { getSearchHistory, pushSearchHistory } from "@/lib/health";
 import { hasMeaningfulMacros, localFoodNutrition, lookupOffFood, offProductNutrition } from "@/lib/offNutrition";
+import {
+  decideFinalOutcome,
+  isBlankQuery,
+  isFoodNameMatch,
+} from "../../supabase/functions/_shared/verify.ts";
 
 export interface NutritionData {
   foodName: string;
@@ -36,11 +40,26 @@ export interface NutritionData {
 export const useNutritionLookup = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [nutritionData, setNutritionData] = useState<NutritionData | null>(null);
+  const [notFound, setNotFound] = useState<string | null>(null);
+  const [lastMatches, setLastMatches] = useState<string[]>([]);
   const [history, setHistory] = useState<string[]>(() => getSearchHistory());
   const { toast } = useToast();
 
+  const showResult = (data: NutritionData, query: string, matchedName: string, source: string) => {
+    setNutritionData(data);
+    setNotFound(null);
+    toast({
+      title: "Nutrition data found!",
+      description:
+        matchedName.toLowerCase() !== query.toLowerCase()
+          ? `Showing ${source} for '${matchedName}' (you searched '${query}').`
+          : `Showing ${source} for ${matchedName}.`,
+    });
+  };
+
   const lookupNutrition = async (foodQuery: string) => {
-    if (!foodQuery.trim()) {
+    const query = foodQuery.trim();
+    if (isBlankQuery(query)) {
       toast({
         title: "Please enter a food item",
         description: "Type the name of a food to search for its nutrition information.",
@@ -50,23 +69,28 @@ export const useNutritionLookup = () => {
     }
 
     setIsLoading(true);
+    // A new search always clears the previous result AND any previous
+    // not-found state, so stale data can never pose as a fresh answer.
     setNutritionData(null);
-    pushSearchHistory(foodQuery.trim());
+    setNotFound(null);
+    setLastMatches([]);
+    pushSearchHistory(query);
     setHistory(getSearchHistory());
 
     const TIMEOUT_MS = 30_000;
 
-    // Resilient chain — text search must work with proper details even when
-    // the Edge Function is down, undeployed, or returns empty (all-zero) data:
-    // 1. Edge AI lookup (richest: full micros + benefits + ayurveda)
-    // 2. Built-in reference database (curated macros + micros + ayurveda)
-    // 3. Open Food Facts direct (real packaged-food data, no key needed)
-    // 4. Clearly-labeled demo fallback (last resort only)
+    // Verified chain — every stage must prove the result matches the query:
+    // 1. Edge AI lookup (verified match + validated AI output)
+    // 2. Built-in reference database (curated keyword match)
+    // 3. Open Food Facts direct (name-verified products only)
+    // Misses everywhere become an explicit "not found" state; source
+    // failures become "temporarily unavailable". Nothing is fabricated.
+    let sourceFailed = false;
     try {
       try {
         const result = await Promise.race([
           supabase.functions.invoke("nutrition-lookup", {
-            body: { foodQuery: foodQuery.trim() },
+            body: { foodQuery: query },
           }),
           new Promise<{ data: null; error: Error }>((_, reject) =>
             setTimeout(() => reject(new Error("Response timed out.")), TIMEOUT_MS)
@@ -74,55 +98,69 @@ export const useNutritionLookup = () => {
         ]);
         const { data, error } = result as { data: unknown; error: unknown };
 
-        if (!error && (data as { success?: boolean; data?: NutritionData } | null)?.success) {
-          const candidate = (data as { data: NutritionData }).data;
-          if (hasMeaningfulMacros(candidate)) {
-            setNutritionData(candidate);
-            toast({
-              title: "Nutrition data found!",
-              description: `Showing nutrition information for ${candidate.foodName}`,
-            });
+        if (!error) {
+          const body = data as {
+            success?: boolean;
+            data?: NutritionData;
+            match?: { name?: string };
+            matches?: unknown;
+          } | null;
+          const candidate = body?.success ? body.data : undefined;
+          const matchName = typeof body?.match?.name === "string" ? body.match.name : "";
+          if (
+            candidate?.foodName &&
+            matchName &&
+            isFoodNameMatch(query, matchName) &&
+            hasMeaningfulMacros(candidate)
+          ) {
+            const others = Array.isArray(body?.matches)
+              ? (body.matches as unknown[]).filter(
+                  (m): m is string => typeof m === "string" && m.toLowerCase() !== matchName.toLowerCase(),
+                ).slice(0, 4)
+              : [];
+            setLastMatches(others);
+            showResult(candidate, query, matchName, "nutrition information");
             return;
           }
-          console.warn("Edge lookup returned empty macros; trying other sources.");
+          console.warn("Edge result failed validation; trying other sources.");
         } else if (error instanceof FunctionsHttpError) {
-          console.warn("Edge lookup failed; trying other sources:", error.status);
+          const status = (error as { status?: number }).status;
+          const payload = await error.context.json().catch(() => null);
+          if (status === 404 || (payload as { error?: string } | null)?.error === "NOT_FOUND") {
+            console.warn("Edge lookup: no verified match; trying other sources.");
+          } else {
+            console.warn("Edge lookup failed; trying other sources:", status);
+            sourceFailed = true;
+          }
         } else if (error) {
           console.warn("Edge lookup unreachable; trying other sources.");
+          sourceFailed = true;
         }
       } catch (edgeError) {
         console.warn("Edge lookup threw; trying other sources.", edgeError);
+        sourceFailed = true;
       }
 
-      const localData = localFoodNutrition(foodQuery);
+      const localData = localFoodNutrition(query);
       if (localData) {
-        setNutritionData(localData);
-        toast({
-          title: "Nutrition data found!",
-          description: `Reference values for ${localData.foodName}.`,
-        });
+        showResult(localData, query, localData.foodName, "reference values");
         return;
       }
 
-      const offData = await lookupOffFood(foodQuery);
-      if (offData) {
-        setNutritionData(offData);
-        toast({
-          title: "Nutrition data found!",
-          description: `Live product data for ${offData.foodName} (Open Food Facts).`,
-        });
+      const off = await lookupOffFood(query);
+      if (off.status === "found") {
+        showResult(off.data, query, off.data.foodName, "live product data (Open Food Facts)");
         return;
       }
+      if (off.status === "failed") sourceFailed = true;
 
-      const fallback = getMockNutrition(foodQuery);
-      setNutritionData(fallback);
-      toast({
-        title: "Showing sample nutrition data",
-        description:
-          "Live sources are unreachable right now — these are clearly-labeled demo values for " +
-          fallback.foodName +
-          ".",
-      });
+      const outcome = decideFinalOutcome(sourceFailed, query);
+      if (outcome.kind === "error") {
+        toast({ title: "Search unavailable", description: outcome.message, variant: "destructive" });
+      } else {
+        setNotFound(query);
+        toast({ title: "No food found", description: outcome.message });
+      }
     } catch (error) {
       console.error("Error looking up nutrition:", error);
       toast({
@@ -137,6 +175,8 @@ export const useNutritionLookup = () => {
 
   const clearNutritionData = () => {
     setNutritionData(null);
+    setNotFound(null);
+    setLastMatches([]);
   };
 
   const lookupByBarcode = async (barcode: string) => {
@@ -168,6 +208,8 @@ export const useNutritionLookup = () => {
   return {
     isLoading,
     nutritionData,
+    notFound,
+    lastMatches,
     history,
     lookupNutrition,
     lookupByBarcode,

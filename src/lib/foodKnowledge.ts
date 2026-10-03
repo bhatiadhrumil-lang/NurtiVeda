@@ -1,6 +1,7 @@
 // Built-in nutrition knowledge: lets text search return proper details
 // WITHOUT depending on the nutrition-lookup Edge Function.
 // Values are approximate per-100g references (USDA-style averages).
+import { isFoodNameMatch } from "../../supabase/functions/_shared/verify.ts";
 
 export interface LocalMacros {
   calories: number;
@@ -623,5 +624,13 @@ export function lookupLocalFood(query: string): LocalFood | null {
   if (best) return best;
   // Single-word plural fallback: "apples" -> "apple"
   const singular = q.replace(/s$/, "");
-  return LOCAL_FOODS.find((f) => f.match.some((m) => singular.includes(m))) ?? null;
+  const pluralHit = LOCAL_FOODS.find((f) => f.match.some((m) => singular.includes(m)));
+  if (pluralHit) return pluralHit;
+  // Fuzzy fallback for misspellings ("bananna" -> Banana). Matching is
+  // still verified — random strings match nothing and return null.
+  return (
+    LOCAL_FOODS.find(
+      (f) => isFoodNameMatch(q, f.name) || f.match.some((m) => isFoodNameMatch(q, m)),
+    ) ?? null
+  );
 }

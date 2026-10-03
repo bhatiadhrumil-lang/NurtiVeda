@@ -10,6 +10,7 @@ import {
   type LocalMacros,
   type MicroEntry,
 } from "@/lib/foodKnowledge";
+import { isFoodNameMatch } from "../../supabase/functions/_shared/verify.ts";
 
 function toNum(v: unknown): number {
   if (typeof v === "number") return Number.isFinite(v) ? v : 0;
@@ -194,10 +195,18 @@ export function offProductNutrition(product: OffProduct, query: string): Nutriti
   return out;
 }
 
-/** Direct browser query to Open Food Facts. No API key, CORS-open. */
-export async function lookupOffFood(query: string, timeoutMs = 12_000): Promise<NutritionData | null> {
+export type OffLookupOutcome =
+  | { status: "found"; data: NutritionData }
+  | { status: "empty" }
+  | { status: "failed" };
+
+/** Direct browser query to Open Food Facts. No API key, CORS-open.
+ *  Only name-verified products are returned — an unrelated top result is
+ *  never substituted. Distinguishes "no match" (empty) from network/API
+ *  failure (failed) so callers never fabricate on errors. */
+export async function lookupOffFood(query: string, timeoutMs = 12_000): Promise<OffLookupOutcome> {
   const q = query.trim();
-  if (!q) return null;
+  if (!q) return { status: "empty" };
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -206,15 +215,17 @@ export async function lookupOffFood(query: string, timeoutMs = 12_000): Promise<
       `&search_terms=${encodeURIComponent(q)}&page_size=5` +
       `&fields=product_name,product_name_en,nutriments`;
     const res = await fetch(url, { signal: controller.signal });
-    if (!res.ok) return null;
+    if (!res.ok) return { status: "failed" };
     const json = (await res.json()) as { products?: OffProduct[] };
     for (const product of json.products ?? []) {
+      const name = product.product_name_en || product.product_name || "";
+      if (!name || !isFoodNameMatch(q, name)) continue;
       const mapped = offProductNutrition(product, q);
-      if (mapped) return mapped;
+      if (mapped) return { status: "found", data: mapped };
     }
-    return null;
+    return { status: "empty" };
   } catch {
-    return null;
+    return { status: "failed" };
   } finally {
     clearTimeout(timer);
   }
